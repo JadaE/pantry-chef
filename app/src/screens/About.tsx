@@ -8,6 +8,7 @@ import { estimateExpiry } from '../groceries';
 import { todayISO, isValidISO } from '../logic';
 import { C } from '../theme';
 import { Btn, Card, Chip, Label } from '../ui';
+import FlagSettings from './FlagSettings';
 
 export default function About({ db, update, onUpdateFound }: { db: DB; update: (f: (d: DB) => DB) => void; onUpdateFound: (u: UpdateInfo | null) => void }) {
   const [busy, setBusy] = useState(false);
@@ -64,11 +65,14 @@ export default function About({ db, update, onUpdateFound }: { db: DB; update: (
         })()}
       </Card>
 
+      <Label>Ingredient warnings</Label>
+      <FlagSettings settings={db.settings} setS={setS} />
+
       <Label>Privacy</Label>
       <Card>
         <Text style={s.body}>Your pantry, photos and notes stay on this phone. No account, no ads, no tracking.</Text>
         <Text style={s.body}>The app only goes online to fetch recipe ideas from TheMealDB (free public recipe database; only ingredient names are sent), to look up scanned barcodes on Open Food Facts (free, open product database; only the barcode number is sent) and to check this app's own download page for updates.</Text>
-        <Text style={s.body}>Receipt reading happens entirely on the phone (Google ML Kit text recognition, offline). Receipt photos never leave the phone.</Text>
+        <Text style={s.body}>Receipt, nutrition label and ingredients photos are read entirely on the phone (Google ML Kit text recognition, offline). Those photos are never sent anywhere and are not added to your pantry; only the text that was read is kept on the item.</Text>
       </Card>
       <Text style={s.small}>{db.items.length} items · {db.bookmarks.length} bookmarks · {db.shopping.length} on shopping list · data format v{db.schema}</Text>
     </ScrollView>
