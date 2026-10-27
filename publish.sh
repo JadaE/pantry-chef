@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Publish Pantry Chef (Android) to its OWN here.now Site:  bash /workspace/pantry-chef/publish.sh
+# Publish Pantry Chef (Android) to its OWN here.now Site:  bash publish.sh
 # Site layout (publish-site/ is uploaded whole, so never delete a version folder):
 #   index.html   blank root ("Nothing here", noindex)      robots.txt  Disallow: /
-#   <install_path>/          install page + APK + shots   (secret)
-#   <update_channel_path>/version.json                    (stable update channel compiled into the app)
-# Reuses the slug in keys/site-config.json. Refuses other projects' slugs. Never prints the API key.
+#   <installPath>/          install page + APK + shots   (secret)
+#   <updateChannelPath>/version.json                    (stable update channel compiled into the app)
+# Reads slug/paths from app/config.local.json (gitignored) with jq. Refuses the example placeholders and every slug in neverPublishTo. Never prints the API key.
 set -euo pipefail
-D=/workspace/pantry-chef; CFG=$D/keys/site-config.json; SITE=$D/publish-site
-SLUG=$(jq -r '.slug//empty' $CFG); INST=$(jq -r .install_path $CFG); UPD=$(jq -r .update_channel_path $CFG)
-case "$SLUG" in YOUR-SITE-SLUG|YOUR-SITE-SLUG|YOUR-SITE-SLUG|YOUR-SITE-SLUG|YOUR-SITE-SLUG|YOUR-SITE-SLUG|YOUR-SITE-SLUG|YOUR-SITE-SLUG) echo "Refusing: $SLUG belongs to another project" >&2; exit 1;; esac
+D=$(cd "$(dirname "$0")" && pwd); CFG=$D/app/config.local.json; SITE=$D/publish-site
+[ -f "$CFG" ] || { echo "app/config.local.json missing: copy app/config.example.json, fill it in. Publishing refuses to run on the example file." >&2; exit 1; }
+SLUG=$(jq -r '.slug//empty' $CFG); INST=$(jq -r .installPath $CFG); UPD=$(jq -r .updateChannelPath $CFG)
+case "$SLUG$INST$UPD" in *YOUR-SITE-SLUG*|*YOUR_SECRET_PATH*|*YOUR_UPDATE_CHANNEL_PATH*|'') echo "config still has placeholder values; NOT publishing" >&2; exit 1;; esac
+jq -e --arg s "$SLUG" '(.neverPublishTo // []) | index($s) | not' $CFG >/dev/null || { echo "Refusing: $SLUG is listed in neverPublishTo (belongs to another project)" >&2; exit 1; }
 PUB=$(ls -d /home/box/agent-data/plugins/cache/cursor-public/here_now/*/skills/here-now/scripts/publish.sh | head -1)
 [ -n "${HERENOW_API_KEY:-}" ] || [ -f "$HOME/.herenow/credentials" ] || { echo "No here.now API key" >&2; exit 1; }
 mkdir -p $SITE/$INST $SITE/$UPD
@@ -20,7 +22,7 @@ printf 'User-agent: *\nDisallow: /\n' > $SITE/robots.txt
 [ -f $SITE/$UPD/version.json ] || echo '{"versionCode":0,"versionName":"0.0.0","apkUrl":"","notes":""}' > $SITE/$UPD/version.json
 KEYVAL="${HERENOW_API_KEY:-$(cat "$HOME/.herenow/credentials" 2>/dev/null || true)}"
 if [ -n "$KEYVAL" ] && grep -rqF -- "$KEYVAL" "$SITE"; then echo "API key in site files; NOT publishing" >&2; exit 1; fi
-if grep -rqF -- "$(cat $D/keys/keystore-password.txt)" "$SITE"; then echo "keystore password in site files; NOT publishing" >&2; exit 1; fi
+if grep -rqF -- "$(jq -r .keystorePassword $CFG)" "$SITE"; then echo "keystore password in site files; NOT publishing" >&2; exit 1; fi
 find $SITE -name '*.keystore' | grep -q . && { echo "keystore in site; NOT publishing" >&2; exit 1; }
 cd $D
 ARGS=("$SITE" --client cursor); [ -n "$SLUG" ] && ARGS+=(--slug "$SLUG")

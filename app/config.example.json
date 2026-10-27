@@ -1,0 +1,7 @@
+{
+  "slug": "YOUR-SITE-SLUG",
+  "installPath": "YOUR_SECRET_PATH",
+  "updateChannelPath": "YOUR_UPDATE_CHANNEL_PATH",
+  "keystorePassword": "YOUR_KEYSTORE_PASSWORD",
+  "neverPublishTo": []
+}

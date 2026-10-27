@@ -2,8 +2,10 @@
 # Stage the install page + APK for one version under its secret path, and point the stable update channel at it.
 # Usage: NOTES="what's new" bash tools/make_site.sh   (reads version from app/app.json). Pattern from photo-cleanup/android.
 set -euo pipefail
-D=/workspace/pantry-chef; CFG=$D/keys/site-config.json; SITE=$D/publish-site
-SLUG=$(jq -r .slug $CFG); INST=$(jq -r .install_path $CFG); UPD=$(jq -r .update_channel_path $CFG)
+D=$(cd "$(dirname "$0")/.." && pwd); CFG=$D/app/config.local.json; SITE=$D/publish-site
+[ -f "$CFG" ] || { echo "app/config.local.json missing (copy config.example.json and fill it in); can't stage a site" >&2; exit 1; }
+jq -e '(.slug|test("^YOUR")|not) and (.installPath|test("^YOUR")|not)' "$CFG" >/dev/null || { echo "config has placeholder values; refusing" >&2; exit 1; }
+SLUG=$(jq -r .slug $CFG); INST=$(jq -r .installPath $CFG); UPD=$(jq -r .updateChannelPath $CFG)
 V=$(node -e "console.log(require('$D/app/app.json').expo.version)"); VC=$(node -e "console.log(require('$D/app/app.json').expo.android.versionCode)")
 APK=PantryChef-v$V.apk; mkdir -p $SITE/$INST $SITE/$UPD; cp $D/dist/$APK $SITE/$INST/
 SHA=$(sha256sum $D/dist/$APK | cut -c1-16); SIZE=$(du -m $D/dist/$APK | cut -f1)

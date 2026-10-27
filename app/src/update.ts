@@ -1,7 +1,8 @@
 // "Update available" check (same pattern as the other sideloaded apps): GET a small version.json from the app's
 // stable, unguessable update channel on its own here.now site. Nothing is sent. Downloading opens the browser.
 import { Linking } from 'react-native';
-import { UPDATE_URL, SITE, VERSION_CODE } from './version';
+import { VERSION_CODE } from './version';
+import { UPDATE_URL, SITE, CONFIGURED } from './config';
 import { loadSetting, saveSetting } from './store';
 const HOUR = 3600000;
 export type UpdateInfo = { versionCode: number; versionName: string; apkUrl: string; notes: string };
@@ -13,6 +14,7 @@ function valid(j: any): UpdateInfo | null {
 /** Returns {info: newer release or null, latest}. Throttled to once per 6h unless force. Throws only when force. */
 export async function checkForUpdate(force = false): Promise<{ info: UpdateInfo | null; latest: UpdateInfo | null; checkedAt: number }> {
   const last = Number((await loadSetting('upd:lastCheck')) || 0);
+  if (!CONFIGURED) { if (force) throw new Error('No update channel configured'); return { info: null, latest: null, checkedAt: last }; } // build made from config.example.json
   if (!force && Date.now() - last < 6 * HOUR) {
     let c: UpdateInfo | null = null;
     try { c = valid(JSON.parse((await loadSetting('upd:latest')) || 'null')); } catch {}
