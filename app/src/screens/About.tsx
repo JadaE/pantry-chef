@@ -26,7 +26,6 @@ export default function About({ db, update, onUpdateFound }: { db: DB; update: (
   const setS = (patch: Partial<DB['settings']>) => update(d => ({ ...d, settings: { ...d.settings, ...patch } }));
   return (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96 }}>
-      <Text style={s.h1}>About</Text>
       <Card style={{ alignItems: 'center', paddingVertical: 22 }}>
         <Text style={{ fontSize: 48 }}>🥕</Text>
         <Text style={s.app}>Pantry Chef</Text>
@@ -77,7 +76,7 @@ export default function About({ db, update, onUpdateFound }: { db: DB; update: (
         <Text style={s.body}>Your pantry, photos and notes stay on this phone. No account, no ads, no tracking.</Text>
         <Text style={s.body}>The app only goes online to fetch recipe ideas from TheMealDB (free public recipe database; only ingredient names are sent), to look up scanned barcodes on Open Food Facts (free, open product database; only the barcode number is sent) and to check this app's own download page for updates.</Text>
         <Text style={s.body}>Receipt, nutrition label and ingredients photos are read entirely on the phone (Google ML Kit text recognition, offline). Those photos are never sent anywhere and are not added to your pantry; only the text that was read is kept on the item.</Text>
-        <Text style={s.body}>Food you log (what, how much, when, for whom) is stored only on this phone. The microphone is used only while you hold a voice log open, and speech is recognized on the phone itself (Android's offline recognizer): no audio is recorded or sent anywhere, and there is no cloud speech service or account. If your phone can't do that, the mic button is hidden.</Text>
+        <Text style={s.body}>Food you log (what, how much, when, for whom) is stored only on this phone. The microphone listens only after you tap the mic, until you tap it again or recognition ends. Speech is recognized on the phone itself (Android's offline recognizer): no audio is recorded or sent anywhere, and there is no cloud speech service or account. If your phone can't do that, the mic button is hidden.</Text>
       </Card>
       <Text style={s.small}>{db.items.length} items · {db.bookmarks.length} bookmarks · {db.shopping.length} on shopping list · data format v{db.schema}</Text>
     </ScrollView>

@@ -14,7 +14,9 @@ AJ=$(node -e "const a=require('./app.json').expo;console.log(a.version+':'+a.and
 VT=$(node -e "const s=require('fs').readFileSync('src/version.ts','utf8');console.log(s.match(/VERSION_NAME = '([^']+)'/)[1]+':'+s.match(/VERSION_CODE = (\\d+)/)[1])")
 [ "$AJ" = "$VT" ] || { echo "Version mismatch: app.json $AJ vs src/version.ts $VT" >&2; exit 1; }
 V=${AJ%%:*}
-npx tsc --noEmit -p . && npx tsx tests/logic.test.ts | tail -1 && npx tsx tests/receipt.test.ts | tail -1 && npx tsx tests/config.test.ts | tail -1 && npx tsx tests/cooking.test.ts | tail -1 && npx tsx tests/nutrition.test.ts | tail -1 && npx tsx tests/warnings.test.ts | tail -1 && npx tsx tests/intake.test.ts | tail -1
+npx tsc --noEmit -p . && npx tsx tests/logic.test.ts | tail -1 && npx tsx tests/receipt.test.ts | tail -1 && npx tsx tests/config.test.ts | tail -1 && npx tsx tests/cooking.test.ts | tail -1 && npx tsx tests/nutrition.test.ts | tail -1 && npx tsx tests/warnings.test.ts | tail -1 && npx tsx tests/intake.test.ts | tail -1 && npx tsx tests/recipesort.test.ts | tail -1
+# v0.0.6: camera preview as TextureView (see tools/patch-expo-camera.js); also runs on npm install (postinstall)
+node $ROOT/tools/patch-expo-camera.js
 [ -d android ] || npx expo prebuild -p android --no-install
 echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 G=android/app/build.gradle

@@ -12,7 +12,7 @@ export default function Saved({ db, update, onOpen }: { db: DB; update: (f: (d: 
       data={db.bookmarks}
       keyExtractor={r => r.id}
       contentContainerStyle={{ padding: 16, paddingBottom: 96 }}
-      ListHeaderComponent={<View style={{ marginBottom: 12 }}><Text style={s.h1}>Bookmarks</Text><Text style={s.sub}>Recipes you starred. Saved on this phone, so they open offline too.</Text></View>}
+      ListHeaderComponent={<View style={{ marginBottom: 12 }}><Text style={s.sub}>Recipes you starred. Saved on this phone, so they open offline too.</Text></View>}
       ListEmptyComponent={<View style={s.empty}><Text style={{ fontSize: 40 }}>☆</Text><Text style={s.sub}>Tap the star on a recipe to keep it here.</Text></View>}
       renderItem={({ item: r }) => {
         const cov = recipeCoverage(r, names, db.settings.assumeStaples);
