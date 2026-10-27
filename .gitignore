@@ -1,5 +1,6 @@
 # secrets / local config
 keys/
+config.local.json
 .env*
 credentials*
 secret-config.json
@@ -7,6 +8,7 @@ site-config.json
 .herenow/
 herenow/
 state.json
+data/
 *.jks
 *.keystore
 *.pem
@@ -34,3 +36,4 @@ logs/
 *.mov
 *.zip
 .DS_Store
+app/src/generated/

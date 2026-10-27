@@ -6,7 +6,7 @@ import { buildShopping, newId, eaters, conflictText, pantryNames, recipeConflict
 import { C, CAT_EMOJI } from '../theme';
 import { Badge, Btn, IconBtn } from '../ui';
 
-export default function RecipeView({ r, db, update, onClose }: { r: RecipeDetail; db: DB; update: (f: (d: DB) => DB) => void; onClose: () => void }) {
+export default function RecipeView({ r, db, update, onClose, onCook }: { r: RecipeDetail; db: DB; update: (f: (d: DB) => DB) => void; onClose: () => void; onCook: () => void }) {
   const cov = recipeCoverage(r, pantryNames(db.items), db.settings.assumeStaples);
   const steps = splitSteps(r.instructions);
   const conflicts = recipeConflicts(r, eaters(db.profiles, db.eatingIds));
@@ -18,6 +18,7 @@ export default function RecipeView({ r, db, update, onClose }: { r: RecipeDetail
     update(d => ({ ...d, shopping: [...d.shopping, ...toShop.map(a => ({ ...a, id: newId() + Math.random().toString(36).slice(2, 4), checked: false, addedAt: Date.now() }))] }));
     try { ToastAndroid.show(`Added ${toShop.length} to your shopping list`, ToastAndroid.SHORT); } catch {}
   };
+  const prog = db.cookingProgress?.[r.id];
   const toggle = () => update(d => ({ ...d, bookmarks: marked ? d.bookmarks.filter(b => b.id !== r.id) : [r, ...d.bookmarks] }));
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -35,7 +36,11 @@ export default function RecipeView({ r, db, update, onClose }: { r: RecipeDetail
             {cov.missing > 0 && <Badge label={`${cov.missing} missing`} fg={C.red} bg={C.redSoft} style={{ marginLeft: 6 }} />}
           </View>
           {conflicts.length > 0 && <View style={s.warn}><Text style={s.warnT}>{conflicts.some(c => c.kind === 'restriction') ? '⛔ Not safe for who is eating' : '🚫 Contains something disliked'}: {conflictText(conflicts)}</Text></View>}
-          <Btn label={marked ? '★ Bookmarked' : '☆ Bookmark'} kind={marked ? 'soft' : 'primary'} onPress={toggle} style={{ marginTop: 14 }} />
+          {prog?.started
+            ? <View><Btn label={`▶ Resume cooking · step ${Math.min(prog.step + 1, Math.max(steps.length, 1))} of ${Math.max(steps.length, 1)}`} onPress={onCook} style={{ marginTop: 14, paddingVertical: 16 }} />
+              <Btn kind="ghost" small label="Start over" onPress={() => { update(d => { const cp = { ...(d.cookingProgress || {}) }; delete cp[r.id]; return { ...d, cookingProgress: cp }; }); }} style={{ marginTop: 6, alignSelf: 'center' }} /></View>
+            : <Btn label="👩‍🍳 Start cooking" onPress={onCook} style={{ marginTop: 14, paddingVertical: 16 }} />}
+          <Btn label={marked ? '★ Bookmarked' : '☆ Bookmark'} kind={marked ? 'soft' : 'ghost'} onPress={toggle} style={{ marginTop: 8 }} />
           {toShop.length > 0 ? <Btn label={`🛒 Add ${toShop.length} missing to shopping list`} kind="soft" onPress={addShop} style={{ marginTop: 8 }} />
             : cov.missing > 0 && onList > 0 ? <Text style={{ color: C.sub, marginTop: 8, textAlign: 'center' }}>🛒 Missing ingredients are on your shopping list</Text> : null}
 

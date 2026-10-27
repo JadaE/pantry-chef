@@ -15,6 +15,7 @@ export default function ReceiptScan({ soonDays, onAdd, onClose }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [showText, setShowText] = useState(false);
+  const [fromPhoto, setFromPhoto] = useState(false); // true only when the text came from reading a photo
   const [review, setReview] = useState<{ drafts: Draft[]; sub: string } | null>(null);
 
   const parse = (t: string) => {
@@ -30,7 +31,7 @@ export default function ReceiptScan({ soonDays, onAdd, onClose }: Props) {
       const res = await recognize(uri);
       const rows = rowsFromOcr(res.lines);
       const t = rows.join('\n');
-      setText(t); setBusy(null);
+      setText(t); setFromPhoto(true); setBusy(null);
       parse(t);
     } catch (e: any) { setBusy(null); Alert.alert('Could not read the receipt', String(e?.message || e)); }
   };
@@ -54,7 +55,7 @@ export default function ReceiptScan({ soonDays, onAdd, onClose }: Props) {
           <Btn label={showText ? 'Hide text' : '⌨️ Paste or type receipt text'} kind="ghost" onPress={() => setShowText(!showText)} style={{ marginTop: 10 }} />
         </>}
         {showText && !busy && <View style={{ marginTop: 14 }}>
-          <Text style={s.p}>{text ? 'This is what was read from the photo. Fix anything that looks wrong, then tap Find items.' : 'One item per line, e.g. "GV WHL MLK 3.48".'}</Text>
+          <Text style={s.p}>{text ? (fromPhoto ? 'This is what was read from the photo. Fix anything that looks wrong, then tap Find items.' : 'Check the lines below. Fix anything that looks wrong, then tap Find items.') : 'One item per line, e.g. "GV WHL MLK 3.48".'}</Text>
           <TextInput value={text} onChangeText={setText} multiline style={s.box} placeholder={'GV WHL MLK 3.48\nBANANAS 1.33\n2 @ 0.98\nTOTAL 5.79'} placeholderTextColor={C.faint} autoCapitalize="characters" />
           <Btn label="Find items" onPress={() => parse(text)} disabled={!text.trim()} style={{ marginTop: 10 }} />
         </View>}
