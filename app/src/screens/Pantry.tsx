@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, Image, StyleSheet, ScrollView } from 'react-native';
-import type { DB, Item } from '../types';
+import type { DB, Item, Profile, Settings } from '../types';
+import { itemWarnings } from '../warnings';
 import { CATEGORIES } from '../types';
 import { expiryLabel, expiryStatus, filterItems, Filter, leftLabel, Sort, sortItems, summary } from '../logic';
 import { C, statusColors, CAT_EMOJI } from '../theme';
@@ -11,7 +12,7 @@ const FILTERS: { k: Filter; label: string }[] = [
 ];
 const SORTS: { k: Sort; label: string }[] = [{ k: 'expiry', label: 'Expiry' }, { k: 'name', label: 'A–Z' }, { k: 'recent', label: 'Newest' }, { k: 'category', label: 'Category' }];
 
-export default function Pantry({ db, onOpen, onAdd, onReceipt, onBarcode }: { db: DB; onOpen: (it: Item) => void; onAdd: () => void; onReceipt: () => void; onBarcode: () => void }) {
+export default function Pantry({ db, onOpen, onAdd, onReceipt, onBarcode, onLabel }: { db: DB; onOpen: (it: Item) => void; onAdd: () => void; onReceipt: () => void; onBarcode: () => void; onLabel: () => void }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [sort, setSort] = useState<Sort>('expiry');
   const [q, setQ] = useState('');
@@ -34,8 +35,9 @@ export default function Pantry({ db, onOpen, onAdd, onReceipt, onBarcode }: { db
         )}
       </View>
       <View style={s.bulk}>
-        <Pressable onPress={onReceipt} style={({ pressed }) => [s.bulkB, pressed && { opacity: 0.7 }]} accessibilityLabel="Scan a receipt"><Text style={s.bulkI}>🧾</Text><Text style={s.bulkT}>Scan receipt</Text></Pressable>
-        <Pressable onPress={onBarcode} style={({ pressed }) => [s.bulkB, { marginLeft: 10 }, pressed && { opacity: 0.7 }]} accessibilityLabel="Scan barcodes"><Text style={s.bulkI}>▦</Text><Text style={s.bulkT}>Scan barcodes</Text></Pressable>
+        <Pressable onPress={onReceipt} style={({ pressed }) => [s.bulkB, pressed && { opacity: 0.7 }]} accessibilityLabel="Scan a receipt"><Text style={s.bulkI}>🧾</Text><Text style={s.bulkT}>Receipt</Text></Pressable>
+        <Pressable onPress={onBarcode} style={({ pressed }) => [s.bulkB, { marginLeft: 10 }, pressed && { opacity: 0.7 }]} accessibilityLabel="Scan barcodes"><Text style={s.bulkI}>▦</Text><Text style={s.bulkT}>Barcodes</Text></Pressable>
+        <Pressable onPress={onLabel} style={({ pressed }) => [s.bulkB, { marginLeft: 10 }, pressed && { opacity: 0.7 }]} accessibilityLabel="Scan a nutrition label"><Text style={s.bulkI}>🏷️</Text><Text style={s.bulkT}>Label</Text></Pressable>
       </View>
       <TextInput value={q} onChangeText={setQ} placeholder="Search items or notes" placeholderTextColor={C.faint} style={s.search} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
@@ -62,14 +64,15 @@ export default function Pantry({ db, onOpen, onAdd, onReceipt, onBarcode }: { db
           <Text style={s.emptyT}>{db.items.length ? 'No items match this filter.' : 'Add your first item'}</Text>
           {!db.items.length && <Text style={s.emptyS}>Scan a grocery receipt or product barcodes to add a whole trip at once, or tap ＋ Add item. Pantry Chef shows what expires soon and suggests recipes from what you have.</Text>}
         </View>}
-        renderItem={({ item }) => <Row it={item} soon={soon} onPress={() => onOpen(item)} />}
+        renderItem={({ item }) => <Row it={item} soon={soon} flags={db.settings} people={db.profiles} onPress={() => onOpen(item)} />}
       />
       <Pressable onPress={onAdd} style={({ pressed }) => [s.fab, pressed && { opacity: 0.8 }]} accessibilityLabel="Add item"><Text style={s.fabT}>＋ Add item</Text></Pressable>
     </View>
   );
 }
 
-function Row({ it, soon, onPress }: { it: Item; soon: number; onPress: () => void }) {
+function Row({ it, soon, flags, people, onPress }: { it: Item; soon: number; flags: Settings; people: Profile[]; onPress: () => void }) {
+  const alerts = (it.nutrition || it.ingredientsText) ? itemWarnings(it, flags, people).filter(w => w.level === 'high').length : 0;
   const st = expiryStatus(it, soon); const col = statusColors[st];
   const qty = it.quantity != null ? `${it.quantity}${it.unit ? ' ' + it.unit : ''}` : it.unit;
   return (
@@ -80,6 +83,7 @@ function Row({ it, soon, onPress }: { it: Item; soon: number; onPress: () => voi
         <Text style={s.meta} numberOfLines={1}>{[it.category, qty, leftLabel(it.percentLeft)].filter(Boolean).join(' · ')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
           {it.expiryEstimated && it.expiresOn ? <EstBadge label={`est. ${expiryLabel(it)}`} fg={col.fg} /> : <Badge label={expiryLabel(it)} fg={col.fg} bg={col.bg} />}
+          {alerts > 0 && <Badge label={`⚠ ${alerts}`} fg={C.red} bg={C.redSoft} style={{ marginLeft: 6 }} />}
           {it.notes ? <Text style={s.note} numberOfLines={1}>📝 {it.notes}</Text> : null}
         </View>
       </View>

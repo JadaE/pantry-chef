@@ -161,6 +161,21 @@ export function restrictionMatches(restriction: string, ingredient: string): boo
   if (rule.except && rule.except.some(e => { const w = raw(e); return w.length > 0 && w.every(x => n.includes(x)); })) return false; // strict: every word of the look-alike present
   return rule.terms.some(t => dislikeMatches(t, ingredient));
 }
+/** Split an ingredient list into separate ingredient names, and separate "may contain / made in a facility with" traces. */
+export function ingredientPieces(text: string): { definite: string[]; trace: string[] } {
+  const t = (text || '').replace(/\s+/g, ' ');
+  const m = t.match(/\b(?:may\s+contain|might\s+contain|(?:processed|manufactured|made|produced|packaged)\s+(?:in|on)\s+(?:a\s+|the\s+)?(?:facility|shared|equipment|line)|shared\s+(?:equipment|facility))/i);
+  const split = (x: string) => x.split(/[,;()\[\]:\u2022.\/]|\band\b|\bor\b/i).map(y => y.trim()).filter(y => y.length > 1);
+  return m ? { definite: split(t.slice(0, m.index)), trace: split(t.slice(m.index! + m[0].length).replace(/^\s*(?:that\s+(?:also\s+)?(?:processes|handles|uses)|which\s+(?:also\s+)?(?:processes|handles)|with|using|containing)\b/i, '')) } : { definite: split(t), trace: [] };
+}
+/** Which ingredients in a label's ingredient text break a hard restriction (group like "dairy" or a literal word). trace = only "may contain". */
+export function restrictionHitsInText(restriction: string, text: string): { piece: string; trace: boolean }[] {
+  const { definite, trace } = ingredientPieces(text);
+  const out: { piece: string; trace: boolean }[] = [];
+  for (const piece of definite) if (restrictionMatches(restriction, piece)) out.push({ piece, trace: false });
+  for (const piece of trace) if (restrictionMatches(restriction, piece) && !out.some(o => o.piece.toLowerCase() === piece.toLowerCase())) out.push({ piece, trace: true });
+  return out;
+}
 export type Conflict = { ingredient: string; kind: 'restriction' | 'dislike'; reasons: string[]; people: string[] };
 /** which ingredients in the recipe conflict with the given people (pass only the people who are eating) */
 export function recipeConflicts(r: Pick<RecipeDetail, 'ingredients'>, people: Profile[]): Conflict[] {
@@ -247,6 +262,12 @@ export function migrate(raw: any): DB {
   }
   db.cookingProgress = cp;
   db.timers = Array.isArray(raw.timers) ? raw.timers.filter((t: any) => t && typeof t.id === 'string' && typeof t.endsAt === 'number' && typeof t.seconds === 'number').slice(0, 30) : [];
+  // v0.0.4: ingredient-flag settings (warnIngredients = household words, flagOverrides = built-in rules switched on/off)
+  db.settings.warnIngredients = Array.isArray(db.settings.warnIngredients) ? db.settings.warnIngredients.filter((x: any) => typeof x === 'string' && x.trim()).slice(0, 100) : [];
+  const fo: Record<string, boolean> = {};
+  if (db.settings.flagOverrides && typeof db.settings.flagOverrides === 'object') for (const [k, v] of Object.entries<any>(db.settings.flagOverrides)) if (typeof v === 'boolean') fo[k] = v;
+  db.settings.flagOverrides = fo;
+  db.items = db.items.map(i => (i.nutrition && typeof i.nutrition === 'object' && i.nutrition.nutrients && typeof i.nutrition.nutrients === 'object' ? i : { ...i, nutrition: null }));
   if (!Array.isArray(db.eatingIds)) db.eatingIds = null;
   if (!db.categoryOffset || typeof db.categoryOffset !== 'object') db.categoryOffset = {};
   db.schema = SCHEMA_VERSION;

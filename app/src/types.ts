@@ -1,6 +1,7 @@
 // Data model. SCHEMA_VERSION bumps when the stored shape changes; logic.migrate() moves old data forward.
 // Fields marked "future" are stored but not used by the v0.0.1 UI yet; they reserve room for later versions.
-export const SCHEMA_VERSION = 3;  // 1: v0.0.1 (profiles). 2: v0.0.2 adds expiryEstimated, brand, OFF nutrition (all optional, no migration needed). 3: v0.0.3 adds cookingProgress and timers (optional; migrate() sanitizes them)
+export const SCHEMA_VERSION = 4;  // 4: v0.0.4 adds nutrition label fields (perContainer), settings.flagOverrides; all optional, migrate() sanitizes.
+//  1: v0.0.1 (profiles). 2: v0.0.2 adds expiryEstimated, brand, OFF nutrition (all optional, no migration needed). 3: v0.0.3 adds cookingProgress and timers (optional; migrate() sanitizes them)
 
 export type ISODate = string; // 'YYYY-MM-DD'
 
@@ -13,6 +14,7 @@ export type NutritionFacts = {
   nutrients: Record<string, NutrientAmount>; // per serving when known, else per 100 g. keys: calories, fat, saturatedFat, carbs, sugars, addedSugars, fiber, protein, sodium(mg)
   per100g?: Record<string, NutrientAmount>;   // Open Food Facts values per 100 g / 100 ml
   perServing?: Record<string, NutrientAmount>; // Open Food Facts values per serving (when the label gives one)
+  perContainer?: Record<string, NutrientAmount>; // v0.0.4: whole-package values from a dual-column label ("per container")
   servingQuantityG?: number | null;            // grams (or ml) in one serving
   packageQuantity?: string | null;             // e.g. "1 gal", "16 oz"
   ingredientsText?: string | null;
@@ -42,7 +44,7 @@ export type Item = {
   // future
   barcode?: string | null;
   brand?: string | null;
-  source?: 'manual' | 'receipt' | 'barcode' | 'shopping';
+  source?: 'manual' | 'receipt' | 'barcode' | 'shopping' | 'label';
   ingredientsText?: string | null; // label ingredient list, for bad-ingredient warnings
   nutrition?: NutritionFacts | null;
   tags?: string[];
@@ -51,7 +53,8 @@ export type Item = {
 export type Settings = {
   soonDays: number;              // "expiring soon" window
   assumeStaples: boolean;        // treat salt, pepper, water, oil as on hand for recipes
-  warnIngredients: string[];     // future: household-wide "bad ingredient" list, flag items whose label lists these
+  warnIngredients: string[];     // household watch list: extra words to flag when a label's ingredients contain them (v0.0.4)
+  flagOverrides?: Record<string, boolean>; // v0.0.4: built-in ingredient flag rules switched on/off (rule id -> on). Missing = rule's default.
 };
 
 /** Daily nutrient limits per person. Defaults follow FDA Daily Values where one exists (editable later).
@@ -109,8 +112,8 @@ export type DB = {
   timers?: CookTimer[];                            // cooking timers (end times, so they survive leaving the app)
 };
 
-export const DEFAULT_SETTINGS: Settings = { soonDays: 5, assumeStaples: true, warnIngredients: [] };
-export const emptyDB = (): DB => ({ schema: SCHEMA_VERSION, items: [], profiles: [], eatingIds: null, settings: { ...DEFAULT_SETTINGS }, bookmarks: [], dismissedRecipes: [], categoryOffset: {}, shopping: [], intake: [], cookingProgress: {}, timers: [] });
+export const DEFAULT_SETTINGS: Settings = { soonDays: 5, assumeStaples: true, warnIngredients: [], flagOverrides: {} };
+export const emptyDB = (): DB => ({ schema: SCHEMA_VERSION, items: [], profiles: [], eatingIds: null, settings: { ...DEFAULT_SETTINGS, flagOverrides: {} }, bookmarks: [], dismissedRecipes: [], categoryOffset: {}, shopping: [], intake: [], cookingProgress: {}, timers: [] });
 
 export const CATEGORIES = ['Produce', 'Meat & Fish', 'Dairy & Eggs', 'Bakery', 'Pantry', 'Canned', 'Frozen', 'Spices', 'Snacks', 'Drinks', 'Condiments', 'Other'];
 export const UNITS = ['pcs', 'lb', 'oz', 'g', 'kg', 'cup', 'L', 'ml', 'can', 'box', 'bag', 'jar', 'bottle', 'pack', 'dozen'];

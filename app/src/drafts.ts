@@ -8,7 +8,7 @@ import { cleanQty, newId, todayISO } from './logic';
 export type Draft = {
   key: string; checked: boolean; name: string; qty: string; unit: string; category: string;
   purchasedOn: string; expiresOn: string | null; estimated: boolean; basis?: string;
-  source: 'receipt' | 'barcode' | 'shopping'; raw?: string; confidence?: 'high' | 'medium' | 'low';
+  source: 'receipt' | 'barcode' | 'shopping' | 'manual'; raw?: string; confidence?: 'high' | 'medium' | 'low';
   barcode?: string; brand?: string | null; imageUrl?: string | null; nutrition?: NutritionFacts | null; ingredientsText?: string | null; recipeName?: string;
 };
 

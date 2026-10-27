@@ -4,7 +4,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import type { DB, Item, RecipeDetail } from './src/types';
 import type { Draft } from './src/drafts';
-import { draftToItem } from './src/drafts';
+import { draftToItem, draftFromName } from './src/drafts';
 import { downloadPhoto } from './src/photos';
 import ReceiptScan from './src/screens/ReceiptScan';
 import BarcodeScan from './src/screens/BarcodeScan';
@@ -16,6 +16,7 @@ import { checkForUpdate, dismiss, dismissed, openDownload, UpdateInfo } from './
 import { C } from './src/theme';
 import Pantry from './src/screens/Pantry';
 import ItemEditor from './src/screens/ItemEditor';
+import LabelScan, { LabelResult, LabelTarget } from './src/screens/LabelScan';
 import Recipes from './src/screens/Recipes';
 import RecipeView from './src/screens/RecipeView';
 import Cooking from './src/screens/Cooking';
@@ -36,7 +37,7 @@ export default function App() {
   const [editing, setEditing] = useState<Item | null | 'new'>(null);
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [upd, setUpd] = useState<UpdateInfo | null>(null);
-  const [bulk, setBulk] = useState<'receipt' | 'barcode' | null>(null);
+  const [bulk, setBulk] = useState<'receipt' | 'barcode' | 'label' | null>(null);
   const [cooking, setCooking] = useState(false);
   const [shopReview, setShopReview] = useState<{ drafts: Draft[]; ids: string[] } | null>(null);
   const dbRef = useRef<DB | null>(null);
@@ -78,6 +79,14 @@ export default function App() {
     try { ToastAndroid.show(`Added ${items.length} item${items.length === 1 ? '' : 's'}`, ToastAndroid.SHORT); } catch {}
     ds.forEach((d, i) => { if (d.imageUrl) downloadPhoto(d.imageUrl).then(uri => { if (uri) update(db => ({ ...db, items: db.items.map(x => (x.id === items[i].id && !x.photoUri ? { ...x, photoUri: uri } : x)) })); }); });
   };
+  // standalone "Scan label": attach nutrition/ingredients to the chosen pantry item, or make a new item for it
+  const saveLabel = (r: LabelResult, target: LabelTarget) => {
+    if (!target) return setBulk(null);
+    if ('id' in target) update(d => ({ ...d, items: d.items.map(x => (x.id === target.id ? { ...x, nutrition: r.nutrition ?? x.nutrition ?? null, ingredientsText: r.ingredientsText ?? x.ingredientsText ?? null, updatedAt: Date.now() } : x)) }));
+    else { const it = draftToItem(draftFromName(target.newName, 'manual', { nutrition: r.nutrition, ingredientsText: r.ingredientsText }), null); update(d => ({ ...d, items: [it, ...d.items] })); }
+    setBulk(null); setTab('pantry');
+    try { ToastAndroid.show('Nutrition saved', ToastAndroid.SHORT); } catch {}
+  };
   const deleteItem = (it: Item) => { deletePhoto(it.photoUri); update(d => ({ ...d, items: d.items.filter(x => x.id !== it.id) })); setEditing(null); };
 
   return (
@@ -95,7 +104,7 @@ export default function App() {
         )}
         {!!db.timers?.length && <TimerStrip timers={db.timers} update={update} showRecipe />}
         <View style={{ flex: 1 }}>
-          <View style={[{ flex: 1 }, tab !== 'pantry' && s.hidden]}><Pantry db={db} onOpen={it => setEditing(it)} onAdd={() => setEditing('new')} onReceipt={() => setBulk('receipt')} onBarcode={() => setBulk('barcode')} /></View>
+          <View style={[{ flex: 1 }, tab !== 'pantry' && s.hidden]}><Pantry db={db} onOpen={it => setEditing(it)} onAdd={() => setEditing('new')} onReceipt={() => setBulk('receipt')} onBarcode={() => setBulk('barcode')} onLabel={() => setBulk('label')} /></View>
           <View style={[{ flex: 1 }, tab !== 'recipes' && s.hidden]}><Recipes db={db} update={update} onOpen={setRecipe} active={tab === 'recipes'} /></View>
           {tab === 'saved' && <Saved db={db} update={update} onOpen={setRecipe} />}
           {tab === 'shop' && <Shopping db={db} update={update} onToPantry={(drafts, ids) => setShopReview({ drafts, ids })} />}
@@ -111,10 +120,11 @@ export default function App() {
           ))}
         </View>
         {editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
-          <ItemEditor item={editing === 'new' ? null : editing} soonDays={db.settings.soonDays} onSave={saveItem} onDelete={deleteItem} onClose={() => setEditing(null)} />
+          <ItemEditor item={editing === 'new' ? null : editing} soonDays={db.settings.soonDays} settings={db.settings} profiles={db.profiles} onSave={saveItem} onDelete={deleteItem} onClose={() => setEditing(null)} />
         </SafeAreaView></View>}
         {bulk && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
           {bulk === 'receipt' ? <ReceiptScan soonDays={db.settings.soonDays} onAdd={ds => addDrafts(ds)} onClose={() => setBulk(null)} />
+            : bulk === 'label' ? <LabelScan items={db.items} ctx={null} onDone={saveLabel} onClose={() => setBulk(null)} />
             : <BarcodeScan soonDays={db.settings.soonDays} onAdd={ds => addDrafts(ds)} onClose={() => setBulk(null)} />}
         </SafeAreaView></View>}
         {shopReview && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
