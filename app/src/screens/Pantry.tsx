@@ -12,7 +12,7 @@ const FILTERS: { k: Filter; label: string }[] = [
 ];
 const SORTS: { k: Sort; label: string }[] = [{ k: 'expiry', label: 'Expiry' }, { k: 'name', label: 'A–Z' }, { k: 'recent', label: 'Newest' }, { k: 'category', label: 'Category' }];
 
-export default function Pantry({ db, onOpen, onAdd, onReceipt, onBarcode, onLabel }: { db: DB; onOpen: (it: Item) => void; onAdd: () => void; onReceipt: () => void; onBarcode: () => void; onLabel: () => void }) {
+export default function Pantry({ db, onOpen, onAdd, onReceipt, onBarcode, onLabel, onAbout, updateReady }: { db: DB; onOpen: (it: Item) => void; onAdd: () => void; onReceipt: () => void; onBarcode: () => void; onLabel: () => void; onAbout: () => void; updateReady?: boolean }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [sort, setSort] = useState<Sort>('expiry');
   const [q, setQ] = useState('');
@@ -25,7 +25,13 @@ export default function Pantry({ db, onOpen, onAdd, onReceipt, onBarcode, onLabe
   const header = (
     <View>
       <View style={s.hero}>
-        <Text style={s.h1}>Pantry</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[s.h1, { flex: 1 }]}>Pantry</Text>
+          <Pressable onPress={onAbout} hitSlop={8} accessibilityRole="button" accessibilityLabel={updateReady ? 'About and settings, update available' : 'About and settings'} style={({ pressed }) => [s.info, pressed && { opacity: 0.6 }]}>
+            <Text style={s.infoT}>ⓘ</Text>
+            {updateReady && <View style={s.dot} />}
+          </Pressable>
+        </View>
         <Text style={s.heroSub}>{sum.total === 0 ? 'Nothing tracked yet' : `${sum.total} item${sum.total === 1 ? '' : 's'}`}</Text>
         {(sum.expired > 0 || sum.soon > 0) && (
           <Pressable onPress={() => setFilter('attention')} style={s.alert}>
@@ -102,6 +108,9 @@ const s = StyleSheet.create({
   bulkI: { fontSize: 18, marginRight: 6, color: C.primary },
   bulkT: { fontSize: 15, fontWeight: '800', color: C.primary },
   h1: { fontSize: 32, fontWeight: '800', color: C.ink },
+  info: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  infoT: { fontSize: 24, color: C.sub, fontWeight: '600' },
+  dot: { position: 'absolute', top: 2, right: 2, width: 12, height: 12, borderRadius: 6, backgroundColor: C.accent, borderWidth: 2, borderColor: C.card },
   heroSub: { fontSize: 15, color: C.sub, marginTop: 2 },
   alert: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 },
   search: { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.line, paddingHorizontal: 14, paddingVertical: 11, fontSize: 16, color: C.ink },

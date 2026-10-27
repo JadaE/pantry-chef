@@ -49,3 +49,21 @@ export function draftToItem(d: Draft, photoUri: string | null): Item {
     nutrition: d.nutrition ?? null, ingredientsText: d.ingredientsText ?? null, source: d.source,
   };
 }
+
+/** v0.0.6: a scanned barcode on the scan screen (count = how many times it was scanned). */
+export type ScanEntry = { code: string; count: number; status: 'looking' | 'found' | 'missing' | 'error'; product?: OffProduct; name: string; lastAt: number; err?: string };
+/** rows that can be added now: found on Open Food Facts, or the user typed a name */
+export const scanReady = (list: ScanEntry[]) => list.filter(e => (e.status === 'found' && !!e.product) || e.name.trim());
+export function scanEntriesToDrafts(list: ScanEntry[]): Draft[] {
+  return scanReady(list).map(e => e.product
+    ? { ...draftFromOff(e.product, e.count), name: e.name.trim() || e.product.name || 'Unnamed product' }
+    : draftFromName(e.name.trim(), 'barcode', { barcode: e.code, qty: String(e.count), raw: `barcode ${e.code} (not in Open Food Facts)` }));
+}
+/** label for the scan screen's bottom button */
+export function scanAddLabel(list: ScanEntry[]): { label: string; enabled: boolean } {
+  const n = scanReady(list).length; const waiting = list.filter(e => e.status === 'looking').length;
+  if (n) return { label: `Add ${n} item${n === 1 ? '' : 's'} to pantry`, enabled: true };
+  if (waiting) return { label: 'Looking up…', enabled: false };
+  if (list.length) return { label: 'Type a name to add it', enabled: false };
+  return { label: 'Scan a barcode to add it', enabled: false };
+}

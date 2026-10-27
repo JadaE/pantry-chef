@@ -1,6 +1,7 @@
 // Pure logic (no React Native imports) so it can be unit-tested with tsx.
 import type { Item, ISODate, RecipeDetail, RecipeSummary, DB, Profile, ShoppingItem } from './types';
 import { emptyDB, SCHEMA_VERSION, DEFAULT_SETTINGS, FDA_DEFAULT_LIMITS } from './types';
+import { cleanRecipePrefs } from './recipeSort';
 
 const DAY = 86400000;
 export const pad = (n: number) => (n < 10 ? '0' : '') + n;
@@ -279,6 +280,7 @@ export function migrate(raw: any): DB {
   if (typeof db.settings.logLowersPantry !== 'boolean') db.settings.logLowersPantry = true;
   if (!Array.isArray(db.eatingIds)) db.eatingIds = null;
   if (!db.categoryOffset || typeof db.categoryOffset !== 'object') db.categoryOffset = {};
+  db.recipePrefs = cleanRecipePrefs(raw.recipePrefs); // v0.0.6
   db.schema = SCHEMA_VERSION;
   return db;
 }
