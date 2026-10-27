@@ -89,7 +89,7 @@ export default function Recipes({ db, update, onOpen, active }: Props) {
       data={cards}
       keyExtractor={x => x.cat}
       ListHeaderComponent={header}
-      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: 16, paddingBottom: 96 }}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={load} colors={[C.primary]} />}
       ListEmptyComponent={<View style={s.center}><Text style={{ fontSize: 40 }}>🍳</Text><Text style={s.sub}>{err || 'No recipes yet. Pull down to load.'}</Text>{err && <Btn label="Retry" onPress={load} style={{ marginTop: 12 }} />}</View>}
       renderItem={({ item: { cat, p } }) => {

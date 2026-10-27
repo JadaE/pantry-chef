@@ -40,7 +40,7 @@ export default function Shopping({ db, update, onToPantry }: Props) {
   );
   return (
     <FlatList
-      data={todo} keyExtractor={i => i.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+      data={todo} keyExtractor={i => i.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 96 }}
       ListHeaderComponent={<View>
         <Text style={s.h1}>Shopping</Text>
         <Text style={s.sub}>{todo.length ? `${todo.length} to buy` : 'Your list is empty'}{done.length ? ` · ${done.length} in the cart` : ''}</Text>
