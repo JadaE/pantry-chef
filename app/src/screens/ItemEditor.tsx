@@ -1,20 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, ScrollView, Image, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import type { Item } from '../types';
+import type { Item, NutritionFacts, Profile, Settings } from '../types';
 import { CATEGORIES, UNITS, LEFT_PRESETS } from '../types';
 import { addDays, addMonths, cleanQty, isValidISO, newId, todayISO, expiryLabel, expiryStatus } from '../logic';
 import { C, CAT_EMOJI, statusColors } from '../theme';
 import { Badge, Btn, Chip, IconBtn, Label, DatePickerModal, EstBadge } from '../ui';
 import { estimateExpiry, describeDays } from '../groceries';
 import { deletePhoto, pickPhoto, takePhoto } from '../photos';
+import LabelScan from './LabelScan';
+import NutritionPanel from './NutritionPanel';
 
-type Props = { item: Item | null; soonDays: number; onSave: (it: Item) => void; onDelete: (it: Item) => void; onClose: () => void };
+type Props = { item: Item | null; soonDays: number; settings: Settings; profiles: Profile[]; onSave: (it: Item) => void; onDelete: (it: Item) => void; onClose: () => void };
 const EXP_QUICK: { label: string; f: (t: string) => string }[] = [
   { label: '+3 days', f: t => addDays(t, 3) }, { label: '+1 week', f: t => addDays(t, 7) }, { label: '+2 weeks', f: t => addDays(t, 14) },
   { label: '+1 month', f: t => addMonths(t, 1) }, { label: '+3 months', f: t => addMonths(t, 3) }, { label: '+6 months', f: t => addMonths(t, 6) }, { label: '+1 year', f: t => addMonths(t, 12) },
 ];
 
-export default function ItemEditor({ item, soonDays, onSave, onDelete, onClose }: Props) {
+export default function ItemEditor({ item, soonDays, settings, profiles, onSave, onDelete, onClose }: Props) {
   const today = todayISO();
   const [name, setName] = useState(item?.name ?? '');
   const [category, setCategory] = useState(item?.category ?? 'Produce');
@@ -41,6 +43,9 @@ export default function ItemEditor({ item, soonDays, onSave, onDelete, onClose }
   const [photo, setPhoto] = useState<string | null>(item?.photoUri ?? null);
   const [notes, setNotes] = useState(item?.notes ?? '');
   const [recipeName, setRecipeName] = useState(item?.recipeName ?? '');
+  const [nutrition, setNutrition] = useState<NutritionFacts | null>(item?.nutrition ?? null);
+  const [ingredients, setIngredients] = useState<string | null>(item?.ingredientsText ?? null);
+  const [labelOpen, setLabelOpen] = useState(false);
   const [newPhotos] = useState<string[]>([]); // photos taken in this session (cleaned up on cancel)
 
   const setP = (n: number) => { const v = Math.max(0, Math.min(100, Math.round(n))); setPct(v); setPctText(String(v)); };
@@ -59,13 +64,15 @@ export default function ItemEditor({ item, soonDays, onSave, onDelete, onClose }
     const now = Date.now();
     onSave({
       ...(item || {}), id: item?.id ?? newId(), name: n, category, quantity: cleanQty(qty), unit, percentLeft: pct,
-      purchasedOn: purchased || null, expiresOn: expires || null, expiryEstimated: expires ? estimated : (noAuto ? false : undefined), photoUri: photo, notes: notes.trim(), recipeName: recipeName.trim() || undefined,
+      purchasedOn: purchased || null, expiresOn: expires || null, expiryEstimated: expires ? estimated : (noAuto ? false : undefined), photoUri: photo, nutrition, ingredientsText: ingredients, notes: notes.trim(), recipeName: recipeName.trim() || undefined,
       createdAt: item?.createdAt ?? now, updatedAt: now,
     } as Item);
   };
   const del = () => item && Alert.alert('Delete item?', `Remove "${item.name}" from your pantry?`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => { newPhotos.forEach(p => deletePhoto(p)); onDelete(item); } }]);
   const st = statusColors[expiryStatus({ expiresOn: isValidISO(expires) ? expires : null }, soonDays)];
 
+  if (labelOpen) return <LabelScan items={[]} ctx={{ name: name.trim() || item?.name || '', barcode: item?.barcode, nutrition, ingredientsText: ingredients }}
+    onDone={r => { setNutrition(r.nutrition); setIngredients(r.ingredientsText); setLabelOpen(false); }} onClose={() => setLabelOpen(false)} />;
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={s.top}>
@@ -82,6 +89,9 @@ export default function ItemEditor({ item, soonDays, onSave, onDelete, onClose }
             {photo && <Btn label="Remove photo" kind="ghost" small onPress={() => { if (newPhotos.includes(photo)) deletePhoto(photo); setPhoto(null); }} />}
           </View>
         </View>
+
+        <NutritionPanel nutrition={nutrition} ingredientsText={ingredients} settings={settings} profiles={profiles} onScan={() => setLabelOpen(true)}
+          onClear={() => Alert.alert('Remove nutrition?', 'Clears the nutrition values and ingredients saved on this item.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => { setNutrition(null); setIngredients(null); } }])} />
 
         <Label>Name</Label>
         <TextInput value={name} onChangeText={setName} placeholder="e.g. Eggs, Spinach, Rice" placeholderTextColor={C.faint} style={s.input} autoFocus={!item} autoCapitalize="words" />

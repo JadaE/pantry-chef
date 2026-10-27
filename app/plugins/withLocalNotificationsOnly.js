@@ -1,5 +1,7 @@
 // expo-notifications also pulls in Firebase push (FCM) pieces and launcher-badge permissions. Pantry Chef only uses LOCAL timer
 // notifications, so remove everything push/badge related from the merged manifest (tools:node="remove").
+// v0.0.4: also removes the inert FirebaseInitProvider and the dead BOOT_COMPLETED/REBOOT/QUICKBOOT intent-filter actions on NotificationsService
+// (the receiver stays: it delivers scheduled local notifications; NOTIFICATION_EVENT and MY_PACKAGE_REPLACED actions are kept).
 // Kept: POST_NOTIFICATIONS, VIBRATE, WAKE_LOCK (local notifications still work). Not requested: SCHEDULE_EXACT_ALARM.
 const { withAndroidManifest } = require('expo/config-plugins');
 
@@ -15,6 +17,8 @@ const PERMISSIONS = [
 ];
 const SERVICES = ['expo.modules.notifications.service.ExpoFirebaseMessagingService', 'com.google.firebase.messaging.FirebaseMessagingService'];
 const RECEIVERS = ['com.google.firebase.iid.FirebaseInstanceIdReceiver'];
+const PROVIDERS = ['com.google.firebase.provider.FirebaseInitProvider'];
+const NOTIF_RECEIVER = 'expo.modules.notifications.service.NotificationsService';
 
 module.exports = function withLocalNotificationsOnly(config) {
   return withAndroidManifest(config, cfg => {
@@ -29,6 +33,14 @@ module.exports = function withLocalNotificationsOnly(config) {
     app.service = app.service || []; app.receiver = app.receiver || [];
     for (const name of SERVICES) if (!app.service.find(x => x.$['android:name'] === name)) app.service.push({ $: { 'android:name': name, 'tools:node': 'remove' } });
     for (const name of RECEIVERS) if (!app.receiver.find(x => x.$['android:name'] === name)) app.receiver.push({ $: { 'android:name': name, 'tools:node': 'remove' } });
+    app.provider = app.provider || [];
+    for (const name of PROVIDERS) if (!app.provider.find(x => x.$['android:name'] === name)) app.provider.push({ $: { 'android:name': name, 'tools:node': 'remove' } });
+    // replace the library's receiver declaration with one that has no boot actions
+    app.receiver = app.receiver.filter(x => x.$['android:name'] !== NOTIF_RECEIVER);
+    app.receiver.push({
+      $: { 'android:name': NOTIF_RECEIVER, 'android:enabled': 'true', 'android:exported': 'false', 'tools:node': 'replace' },
+      'intent-filter': [{ $: { 'android:priority': '-1' }, action: [{ $: { 'android:name': 'expo.modules.notifications.NOTIFICATION_EVENT' } }, { $: { 'android:name': 'android.intent.action.MY_PACKAGE_REPLACED' } }] }],
+    });
     return cfg;
   });
 };

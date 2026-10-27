@@ -3,7 +3,7 @@
 // "per serving / per container" labels and ML Kit's column-split ordering. Run: npx tsx tests/nutrition.test.ts
 import assert from 'assert';
 import { readFileSync } from 'fs';
-import { parseLabel, parseIngredients, labelLooksUsable, dvPct } from '../src/nutrition';
+import { parseLabel, parseIngredients, labelLooksUsable, dvPct, fieldsFromFacts, factsFromFields, servingQuantityOf } from '../src/nutrition';
 let n = 0; const t = (name: string, f: () => void) => { try { f(); } catch (e) { console.error('FAILED: ' + name); throw e; } n++; };
 const load = (f: string) => parseLabel(readFileSync(__dirname + `/labels/${f}.txt`, 'utf8'));
 const amt = (p: ReturnType<typeof parseLabel>, k: string) => p.nutrition.nutrients[k]?.amount;
@@ -93,4 +93,16 @@ t('ingredients: header and trailer stripped, lines joined, hyphen kept', () => {
 });
 t('ingredients: a photo of just the list (no header) is kept whole', () => { assert.equal(parseIngredients('Whole grain oats,\nsugar, salt'), 'Whole grain oats, sugar, salt'); });
 t('ingredients: header with OCR slip', () => { assert.equal(parseIngredients('lngredients: Milk, Cream. Best by: see lid'), 'Milk, Cream.'); });
+t('review screen round trip: facts -> fields -> facts keeps everything; edits and blanks work', () => {
+  const p = load('soda-dual'); const f = fieldsFromFacts(p.nutrition);
+  assert.deepEqual(f.sodium, { amount: '45', dv: '2' });
+  const back = factsFromFields(f, { servingSize: p.nutrition.servingSize, servings: '2.5', rawText: 'x', perContainer: p.nutrition.perContainer, ingredientsText: 'Water, sugar' })!;
+  assert.deepEqual(back.nutrients, p.nutrition.nutrients); assert.equal(back.servingsPerContainer, 2.5); assert.deepEqual(back.perContainer, p.nutrition.perContainer);
+  assert.equal(back.source, 'ocr'); assert.equal(back.ingredientsText, 'Water, sugar'); assert.equal(back.servingQuantityG, 240); assert.equal(back.per100g!.carbs.amount, 11.67);
+  f.sodium = { amount: '60,5', dv: '' }; f.protein = { amount: '', dv: '' };
+  const edited = factsFromFields(f, { servingSize: '1 cup (240mL)', servings: '' })!;
+  assert.deepEqual(edited.nutrients.sodium, { amount: 60.5, unit: 'mg', dv: null }); assert.equal(edited.nutrients.protein, undefined); assert.equal(edited.servingsPerContainer, null);
+  assert.equal(factsFromFields({}, {}), null);
+  assert.equal(servingQuantityOf('1 oz (28g/About 15 chips)'), 28); assert.equal(servingQuantityOf('2 tbsp'), null);
+});
 console.log(`nutrition tests: ${n} passed`);

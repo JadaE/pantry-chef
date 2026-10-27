@@ -249,3 +249,39 @@ export function parseIngredients(text: string): string {
   t = t.replace(/(\w)-[ \t]*\n[ \t]*(?=[a-z])/gi, '$1-').replace(/\s*\n\s*/g, ' ').replace(/\s+/g, ' ').replace(/\s+([,.;:)])/g, '$1').trim();
   return t.replace(/^[\s,.:;]+/, '').slice(0, 2500);
 }
+
+// ---------- review-screen helpers (pure, so they are tested) ----------
+/** grams (or ml) in one serving from text like "2/3 cup (55g)" or "1 oz (28g/About 15 chips)" */
+export function servingQuantityOf(servingSize: string | undefined | null): number | null {
+  if (!servingSize) return null;
+  const m = servingSize.match(/\(\s*(?:about\s+)?(\d+(?:\.\d+)?)\s*(g|ml)\s*\)/i) || servingSize.match(/(\d+(?:\.\d+)?)\s*(g|ml)\b/i);
+  return m ? Number(m[1]) : null;
+}
+export type FieldVals = Record<string, { amount: string; dv: string }>;
+const fmt = (x: number | null | undefined) => (x == null || !Number.isFinite(x) ? '' : String(Math.round(x * 1000) / 1000));
+export function fieldsFromFacts(n: NutritionFacts | null | undefined): FieldVals {
+  const out: FieldVals = {};
+  for (const [k, v] of Object.entries(n?.perServing && Object.keys(n.perServing).length ? n.perServing : n?.nutrients || {})) if (NUTRIENT_BY_KEY[k]) out[k] = { amount: fmt(v.amount), dv: fmt(v.dv) };
+  return out;
+}
+const num = (s: string): number | null => { const t = s.replace(',', '.').replace('%', '').trim(); if (!t) return null; const v = Number(t); return Number.isFinite(v) && v >= 0 ? v : null; };
+/** Review-screen text fields -> NutritionFacts (source 'ocr', same structure as Open Food Facts data). Returns null when nothing was filled in. */
+export function factsFromFields(f: FieldVals, o: { servingSize?: string; servings?: string; rawText?: string; perContainer?: Record<string, NutrientAmount>; ingredientsText?: string | null; capturedAt?: number }): NutritionFacts | null {
+  const nutrients: Record<string, NutrientAmount> = {};
+  for (const def of NUTRIENTS) {
+    const v = f[def.key]; if (!v) continue;
+    const amount = num(v.amount), dv = num(v.dv);
+    if (amount == null && dv == null) continue;
+    nutrients[def.key] = { amount, unit: def.unit, dv: def.key === 'calories' ? null : dv };
+  }
+  const servingSize = (o.servingSize || '').trim() || undefined;
+  const servings = num(o.servings || '');
+  if (!Object.keys(nutrients).length && !servingSize && servings == null) return null;
+  const q = servingQuantityOf(servingSize);
+  const pc = o.perContainer && Object.keys(o.perContainer).length ? o.perContainer : undefined;
+  return {
+    servingSize, servingsPerContainer: servings && servings > 0 ? servings : null, calories: nutrients.calories?.amount ?? null, nutrients, perServing: { ...nutrients },
+    perContainer: pc, per100g: q && q > 0 ? scale(nutrients, 100 / q) : undefined, servingQuantityG: q,
+    ingredientsText: o.ingredientsText || null, source: 'ocr', rawText: o.rawText, capturedAt: o.capturedAt ?? Date.now(),
+  };
+}
