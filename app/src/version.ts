@@ -1,3 +1,3 @@
 // Keep in sync with app.json (expo.version / android.versionCode). build-apk.sh checks this.
-export const VERSION_NAME = '0.0.5';
-export const VERSION_CODE = 5;
+export const VERSION_NAME = '0.0.6';
+export const VERSION_CODE = 6;

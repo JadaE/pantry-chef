@@ -142,10 +142,10 @@ t('ingredients from a photo feed the flags and restrictions', () => {
 t('migrate: schema 5, settings sanitized, old data untouched, bad nutrition dropped', () => {
   const old = { schema: 3, items: [{ id: 'a', name: 'Milk', nutrition: { nutrients: { calories: { amount: 100, unit: 'kcal' } }, source: 'openfoodfacts' } }, { id: 'b', name: 'Eggs', nutrition: 'junk' }], profiles: [], settings: { soonDays: 3, assumeStaples: true, warnIngredients: ['palm oil', '', 5] } };
   const db = migrate(old);
-  assert.equal(db.schema, SCHEMA_VERSION); assert.equal(SCHEMA_VERSION, 5);
+  assert.equal(db.schema, SCHEMA_VERSION); assert.equal(SCHEMA_VERSION, 6);
   assert.deepEqual(db.settings.warnIngredients, ['palm oil']); assert.deepEqual(db.settings.flagOverrides, {}); assert.equal(db.settings.soonDays, 3);
   assert.equal(db.items[0].nutrition!.nutrients.calories.amount, 100); assert.equal(db.items[1].nutrition, null);
   assert.deepEqual(migrate({ ...old, settings: { flagOverrides: { msg: true, dyes: 'x' } } }).settings.flagOverrides, { msg: true });
-  assert.equal(emptyDB().schema, 5);
+  assert.equal(emptyDB().schema, SCHEMA_VERSION);
 });
 console.log(`warnings tests: ${n} passed`);

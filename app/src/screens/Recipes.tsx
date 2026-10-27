@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, FlatList, Image, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, FlatList, Image, Pressable, StyleSheet, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
 import type { DB, RecipeDetail } from '../types';
 import { Candidate, eaters, pantryNames, pickForCategory, recipeConflicts, recipeCoverage } from '../logic';
 import { buildCandidates, recipeDetail } from '../recipes';
 import { C, CAT_EMOJI } from '../theme';
-import { Badge, Btn, IconBtn } from '../ui';
+import { Badge, Btn, Chip, IconBtn } from '../ui';
+import { RECIPE_SORTS, RecipeSort, cleanRecipePrefs, onlyCat, sortRecipeCards, toggleCat, visibleCats } from '../recipeSort';
 
-type Props = { db: DB; update: (f: (d: DB) => DB) => void; onOpen: (r: RecipeDetail) => void; active: boolean };
+type Props = { db: DB; update: (f: (d: DB) => DB) => void; onOpen: (r: RecipeDetail) => void; active: boolean; onSaved: () => void };
 
-export default function Recipes({ db, update, onOpen, active }: Props) {
+export default function Recipes({ db, update, onOpen, active, onSaved }: Props) {
   const [byCat, setByCat] = useState<Record<string, Candidate[]> | null>(null);
   const [order, setOrder] = useState<string[]>([]);
   const [details, setDetails] = useState<Record<string, RecipeDetail | null>>({});
@@ -65,10 +66,25 @@ export default function Recipes({ db, update, onOpen, active }: Props) {
   const isMarked = (id: string) => db.bookmarks.some(b => b.id === id);
   const toggleMark = (r: RecipeDetail) => update(d => ({ ...d, bookmarks: d.bookmarks.some(b => b.id === r.id) ? d.bookmarks.filter(b => b.id !== r.id) : [r, ...d.bookmarks] }));
 
-  const cards = order.map(c => ({ cat: c, p: current(c) })).filter(x => x.p) as { cat: string; p: Candidate }[];
+  // v0.0.6: sort + show/hide categories (saved in db.recipePrefs)
+  const prefs = cleanRecipePrefs(db.recipePrefs);
+  const setPrefs = (p: Partial<typeof prefs>) => update(d => ({ ...d, recipePrefs: { ...cleanRecipePrefs(d.recipePrefs), ...p } }));
+  const shownCats = visibleCats(order, prefs.hiddenCats);
+  const cards = sortRecipeCards(shownCats.map(c => {
+    const p = current(c); const d = p ? details[p.id] : null;
+    const cov = d ? recipeCoverage(d, names, db.settings.assumeStaples) : null;
+    return { cat: c, p, name: p?.name ?? '', rank: order.indexOf(c), have: cov?.have ?? null, total: cov?.total ?? null };
+  }).filter(x => x.p), prefs.sort) as { cat: string; p: Candidate }[];
+  const hiddenN = order.filter(c => prefs.hiddenCats.includes(c)).length;
   const header = (
     <View style={{ marginBottom: 12 }}>
-      <Text style={s.h1}>Recipes</Text>
+      <View style={s.titleRow}>
+        <Text style={[s.h1, { flex: 1 }]}>Recipes</Text>
+        <Pressable onPress={onSaved} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Saved recipes, ${db.bookmarks.length}`} style={({ pressed }) => [s.star, pressed && { opacity: 0.6 }]}>
+          <Text style={s.starI}>⭐</Text>
+          {db.bookmarks.length > 0 && <View style={s.starN}><Text style={s.starNT}>{db.bookmarks.length}</Text></View>}
+        </Pressable>
+      </View>
       <Text style={s.sub}>{db.items.length ? 'One idea per category, ranked by how many ingredients you already have.' : 'Add pantry items to get matched ideas. Meanwhile, here is one idea per category.'}</Text>
       {db.profiles.length > 0 && <View style={{ marginTop: 10 }}>
         <Text style={s.who}>Who's eating?</Text>
@@ -80,6 +96,15 @@ export default function Recipes({ db, update, onOpen, active }: Props) {
         </View>
       </View>}
       {blocked.size > 0 && <Text style={s.note}>🚫 Skipped {blocked.size} recipe{blocked.size === 1 ? '' : 's'} with something {eating.length === 1 ? eating[0].name : 'someone eating'} can't have or doesn't like.</Text>}
+      {order.length > 1 && <>
+        <Text style={[s.who, { marginTop: 12 }]}>Show{hiddenN ? ` (${order.length - hiddenN} of ${order.length})` : ''} · long-press = only that one</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Chip label="All" on={hiddenN === 0} onPress={() => setPrefs({ hiddenCats: [] })} color={C.accent} />
+          {order.slice().sort().map(c => <Chip key={c} label={`${CAT_EMOJI[c] || '🍽️'} ${c}`} on={!prefs.hiddenCats.includes(c)} color={C.accent}
+            onPress={() => setPrefs({ hiddenCats: toggleCat(order, prefs.hiddenCats, c) })} onLongPress={() => setPrefs({ hiddenCats: onlyCat(order, c) })} />)}
+        </ScrollView>
+        <View style={s.sortRow}><Text style={s.sortL}>Sort</Text>{RECIPE_SORTS.map(o => <Pressable key={o.k} onPress={() => setPrefs({ sort: o.k as RecipeSort })} hitSlop={6} accessibilityRole="button" accessibilityState={{ selected: prefs.sort === o.k }}><Text style={[s.sortO, prefs.sort === o.k && s.sortOn]}>{o.label}</Text></Pressable>)}</View>
+      </>}
       {db.dismissedRecipes.length > 0 && <Pressable onPress={() => update(d => ({ ...d, dismissedRecipes: [] }))}><Text style={s.link}>Show {db.dismissedRecipes.length} hidden recipe{db.dismissedRecipes.length === 1 ? '' : 's'} again</Text></Pressable>}
     </View>
   );
@@ -122,6 +147,15 @@ export default function Recipes({ db, update, onOpen, active }: Props) {
 }
 const s = StyleSheet.create({
   h1: { fontSize: 32, fontWeight: '800', color: C.ink },
+  titleRow: { flexDirection: 'row', alignItems: 'center' },
+  star: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  starI: { fontSize: 22 },
+  starN: { position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  starNT: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  sortRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 6 },
+  sortL: { color: C.faint, fontSize: 13, marginRight: 10 },
+  sortO: { color: C.sub, fontSize: 14, marginRight: 14, fontWeight: '600', paddingVertical: 4 },
+  sortOn: { color: C.primary, textDecorationLine: 'underline' },
   sub: { fontSize: 14, color: C.sub, marginTop: 4, lineHeight: 20, textAlign: 'left' },
   link: { color: C.primary, fontWeight: '700', marginTop: 8 },
   who: { fontSize: 12, fontWeight: '700', color: C.sub, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },

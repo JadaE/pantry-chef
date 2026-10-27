@@ -1,9 +1,11 @@
 // Data model. SCHEMA_VERSION bumps when the stored shape changes; logic.migrate() moves old data forward.
 // Fields marked "future" are stored but not used by the v0.0.1 UI yet; they reserve room for later versions.
-export const SCHEMA_VERSION = 5;  // 5: v0.0.5 intake log (IntakeEntry gets meal/servings detail, db.logPeopleIds, settings.logLowersPantry); all optional, migrate() sanitizes.
+export const SCHEMA_VERSION = 6;  // 6: v0.0.6 adds db.recipePrefs (recipe sort + hidden categories); optional, migrate() sanitizes.
+// 5: v0.0.5 intake log (IntakeEntry gets meal/servings detail, db.logPeopleIds, settings.logLowersPantry); all optional, migrate() sanitizes.
 //  4: v0.0.4 adds nutrition label fields (perContainer), settings.flagOverrides; all optional, migrate() sanitizes.
 //  1: v0.0.1 (profiles). 2: v0.0.2 adds expiryEstimated, brand, OFF nutrition (all optional, no migration needed). 3: v0.0.3 adds cookingProgress and timers (optional; migrate() sanitizes them)
 
+import { DEFAULT_RECIPE_PREFS, RecipePrefs } from './recipeSort';
 export type ISODate = string; // 'YYYY-MM-DD'
 
 export type NutrientAmount = { amount: number | null; unit: string; dv?: number | null };
@@ -122,6 +124,7 @@ export type DB = {
   bookmarks: RecipeDetail[];
   dismissedRecipes: string[];             // recipe ids hidden from suggestions
   categoryOffset: Record<string, number>; // "refresh" position per recipe category
+  recipePrefs?: RecipePrefs;              // v0.0.6: Recipes tab sort + hidden categories
   shopping: ShoppingItem[];               // future
   intake: IntakeEntry[];                  // v0.0.5: food log
   logPeopleIds?: string[];                // v0.0.5: who the last log was for (default for the next one)
@@ -130,7 +133,7 @@ export type DB = {
 };
 
 export const DEFAULT_SETTINGS: Settings = { soonDays: 5, assumeStaples: true, warnIngredients: [], flagOverrides: {}, logLowersPantry: true };
-export const emptyDB = (): DB => ({ schema: SCHEMA_VERSION, items: [], profiles: [], eatingIds: null, settings: { ...DEFAULT_SETTINGS, flagOverrides: {} }, logPeopleIds: [], bookmarks: [], dismissedRecipes: [], categoryOffset: {}, shopping: [], intake: [], cookingProgress: {}, timers: [] });
+export const emptyDB = (): DB => ({ schema: SCHEMA_VERSION, items: [], profiles: [], eatingIds: null, settings: { ...DEFAULT_SETTINGS, flagOverrides: {} }, logPeopleIds: [], bookmarks: [], dismissedRecipes: [], categoryOffset: {}, recipePrefs: { ...DEFAULT_RECIPE_PREFS, hiddenCats: [] }, shopping: [], intake: [], cookingProgress: {}, timers: [] });
 
 export const CATEGORIES = ['Produce', 'Meat & Fish', 'Dairy & Eggs', 'Bakery', 'Pantry', 'Canned', 'Frozen', 'Spices', 'Snacks', 'Drinks', 'Condiments', 'Other'];
 export const UNITS = ['pcs', 'lb', 'oz', 'g', 'kg', 'cup', 'L', 'ml', 'can', 'box', 'bag', 'jar', 'bottle', 'pack', 'dozen'];

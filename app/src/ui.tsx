@@ -1,16 +1,19 @@
 import React from 'react';
 import { Pressable, Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { C } from './theme';
-export function Chip({ label, on, onPress, color }: { label: string; on?: boolean; onPress?: () => void; color?: string }) {
+export function Chip({ label, on, onPress, onLongPress, color }: { label: string; on?: boolean; onPress?: () => void; onLongPress?: () => void; color?: string }) {
   const c = color || C.primary;
-  return <Pressable onPress={onPress} style={({ pressed }) => [s.chip, on && { backgroundColor: c, borderColor: c }, pressed && { opacity: 0.7 }]} hitSlop={4}>
+  return <Pressable onPress={onPress} onLongPress={onLongPress} accessibilityRole="button" accessibilityState={{ selected: !!on }} style={({ pressed }) => [s.chip, on && { backgroundColor: c, borderColor: c }, pressed && { opacity: 0.7 }]} hitSlop={4}>
     <Text style={[s.chipT, on && { color: '#fff' }]}>{label}</Text></Pressable>;
 }
 export function Btn({ label, onPress, kind = 'primary', style, small, disabled }: { label: string; onPress?: () => void; kind?: 'primary' | 'ghost' | 'danger' | 'soft'; style?: ViewStyle; small?: boolean; disabled?: boolean }) {
-  const bg = kind === 'primary' ? C.primary : kind === 'danger' ? C.red : kind === 'soft' ? C.primarySoft : 'transparent';
-  const fg = kind === 'primary' || kind === 'danger' ? '#fff' : C.primary;
-  return <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [s.btn, small && s.btnSmall, { backgroundColor: bg, borderColor: kind === 'ghost' ? C.line : bg }, (pressed || disabled) && { opacity: 0.6 }, style]}>
-    <Text style={[s.btnT, small && { fontSize: 14 }, { color: fg }]}>{label}</Text></Pressable>;
+  // v0.0.6: disabled buttons get a gray fill with dark-gray text (readable) instead of a faded color, and a minimum height so
+  // a `flex: 1` style in a column can't squash the label to nothing (the empty green "Log it" bar).
+  const bg = disabled ? (kind === 'ghost' ? 'transparent' : C.graySoft) : kind === 'primary' ? C.primary : kind === 'danger' ? C.red : kind === 'soft' ? C.primarySoft : 'transparent';
+  const fg = disabled ? C.sub : kind === 'primary' || kind === 'danger' ? '#fff' : C.primary;
+  return <Pressable disabled={disabled} onPress={onPress} accessibilityRole="button" accessibilityState={{ disabled: !!disabled }} accessibilityLabel={label}
+    style={({ pressed }) => [s.btn, small && s.btnSmall, { backgroundColor: bg, borderColor: kind === 'ghost' || disabled ? C.line : bg }, pressed && { opacity: 0.6 }, style, { flexBasis: 'auto' }]}>
+    <Text style={[s.btnT, small && { fontSize: 14 }, { color: fg }]} numberOfLines={2}>{label}</Text></Pressable>;
 }
 export function Badge({ label, fg, bg, style }: { label: string; fg: string; bg: string; style?: ViewStyle }) {
   return <View style={[s.badge, { backgroundColor: bg }, style]}><Text style={[s.badgeT, { color: fg }]}>{label}</Text></View>;
@@ -23,8 +26,8 @@ export const Label = ({ children }: { children: React.ReactNode }) => <Text styl
 const s: any = StyleSheet.create({
   chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, marginRight: 6, marginBottom: 6 },
   chipT: { fontSize: 14, color: C.ink, fontWeight: '600' },
-  btn: { paddingVertical: 13, paddingHorizontal: 18, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  btnSmall: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 },
+  btn: { minHeight: 48, paddingVertical: 13, paddingHorizontal: 18, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  btnSmall: { minHeight: 36, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 },
   btnT: { fontSize: 16, fontWeight: '700' },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, alignSelf: 'flex-start' },
   badgeT: { fontSize: 12, fontWeight: '700' },

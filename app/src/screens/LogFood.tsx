@@ -1,7 +1,7 @@
 // Quick food log. One text box (type, or tap the mic) -> a one-line confirm card -> "Log it". No form.
 //   "2 servings Chips, 320 cal"  [who chips] [meal chip] [warnings]  [Log it]
 // Also: scan a barcode, or tap a recent pantry item (big chips). Everything stays on the phone.
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, ToastAndroid, Vibration, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import type { DB, Item, Meal, NutritionFacts } from '../types';
@@ -15,7 +15,7 @@ import { C } from '../theme';
 import { Btn, Card, Chip, IconBtn } from '../ui';
 import LabelScan, { LabelResult } from './LabelScan';
 
-type Props = { db: DB; update: (f: (d: DB) => DB) => void; onClose: () => void; startScan?: boolean };
+type Props = { db: DB; update: (f: (d: DB) => DB) => void; onClose: () => void; startScan?: boolean; backRef?: React.MutableRefObject<null | (() => void)> };
 const toast = (m: string) => { try { ToastAndroid.show(m, ToastAndroid.SHORT); } catch {} };
 const MEALS: Meal[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -23,7 +23,7 @@ const DAY = 86400000;
 const validCode = (c: string) => /^\d{8}$|^\d{12,14}$/.test(c);
 const QUICK = [0.5, 1, 1.5, 2];
 
-export default function LogFood({ db, update, onClose, startScan }: Props) {
+export default function LogFood({ db, update, onClose: closeNow, startScan, backRef }: Props) {
   const [text, setText] = useState('');
   const [pick, setPick] = useState<Record<number, string | null>>({});        // part index -> chosen item id (null = "just a note")
   const [amt, setAmt] = useState<Record<number, number>>({});                  // part index -> servings chosen with the quick chips
@@ -34,6 +34,11 @@ export default function LogFood({ db, update, onClose, startScan }: Props) {
   const [lower, setLower] = useState(db.settings.logLowersPantry !== false);
   const [scan, setScan] = useState(!!startScan);
   const [scanMsg, setScanMsg] = useState<string | null>(null);
+  // v0.0.6: if the camera is open, unmount it first and close a moment later (clean camera teardown; see BarcodeScan)
+  const closeT = useRef<any>(null);
+  useEffect(() => () => clearTimeout(closeT.current), []);
+  const onClose = () => { if (scan) { setScan(false); closeT.current = setTimeout(closeNow, 250); } else closeNow(); };
+  useEffect(() => { if (!backRef) return; backRef.current = () => { abortListening(); onClose(); }; return () => { backRef.current = null; }; });
   const [labelFor, setLabelFor] = useState<number | null>(null);
   const [listening, setListening] = useState(false);
   const [micMsg, setMicMsg] = useState('');
@@ -202,7 +207,7 @@ export default function LogFood({ db, update, onClose, startScan }: Props) {
         </>}
       </ScrollView>
       <View style={s.bar}>
-        <Btn label={rows.length ? `Log it${effWho.length > 1 ? ` for ${effWho.length}` : ''}` : 'Log it'} onPress={commit} disabled={!rows.length} style={{ flex: 1, paddingVertical: 17 }} />
+        <Btn label={rows.length ? `✓ Log it${effWho.length > 1 ? ` for ${effWho.length}` : ''}` : scan ? 'Scan a barcode to log it' : 'Type or say what you ate'} onPress={commit} disabled={!rows.length} style={{ paddingVertical: 17 }} />
       </View>
     </View>
   );

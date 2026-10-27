@@ -2,14 +2,14 @@
   "expo": {
     "name": "Pantry Chef",
     "slug": "pantry-chef",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "backgroundColor": "#F7F4EE",
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.pantrychef.app",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#2F7D57",
         "foregroundImage": "./assets/adaptive-icon.png"

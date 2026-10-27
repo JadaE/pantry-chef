@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, BackHandler, AppState, ActivityIndicator, ToastAndroid, Keyboard } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar, setStatusBarHidden, setStatusBarStyle } from 'expo-status-bar';
 import type { DB, Item, RecipeDetail } from './src/types';
 import type { Draft } from './src/drafts';
 import { draftToItem, draftFromName } from './src/drafts';
@@ -28,10 +28,13 @@ import Household from './src/screens/Household';
 import Today from './src/screens/Today';
 import LogFood from './src/screens/LogFood';
 
-type Tab = 'pantry' | 'recipes' | 'saved' | 'shop' | 'today' | 'people' | 'about';
+// v0.0.6: Saved moved to a ⭐ button on Recipes, About to an ⓘ button on Pantry (both open as full-screen pages).
+type Tab = 'pantry' | 'recipes' | 'shop' | 'today' | 'people';
 const TABS: { k: Tab; icon: string; label: string }[] = [
-  { k: 'pantry', icon: '🧺', label: 'Pantry' }, { k: 'recipes', icon: '🍳', label: 'Recipes' }, { k: 'saved', icon: '★', label: 'Saved' }, { k: 'shop', icon: '🛒', label: 'Shopping' }, { k: 'today', icon: '📊', label: 'Intake' }, { k: 'people', icon: '👥', label: 'People' }, { k: 'about', icon: 'ⓘ', label: 'About' },
+  { k: 'pantry', icon: '🧺', label: 'Pantry' }, { k: 'recipes', icon: '🍳', label: 'Recipes' }, { k: 'shop', icon: '🛒', label: 'Shopping' }, { k: 'today', icon: '📊', label: 'Intake' }, { k: 'people', icon: '👥', label: 'People' },
 ];
+type Page = 'saved' | 'about';
+const PAGE_TITLE: Record<Page, string> = { saved: '⭐ Saved recipes', about: 'About & settings' };
 
 export default function App() {
   const [db, setDb] = useState<DB | null>(null);
@@ -44,6 +47,12 @@ export default function App() {
   const [logging, setLogging] = useState<null | 'text' | 'scan'>(null);
   const [kb, setKb] = useState(false);
   const [shopReview, setShopReview] = useState<{ drafts: Draft[]; ids: string[] } | null>(null);
+  const [page, setPage] = useState<Page | null>(null);
+  /** a screen that needs to clean up before closing (camera screens) can take over the Android back button */
+  const backOverride = useRef<null | (() => void)>(null);
+  // Make sure the status bar is visible with dark icons whenever we're back on the main screens (v0.0.6).
+  const restoreBars = useCallback(() => { try { setStatusBarHidden(false, 'none'); setStatusBarStyle('dark'); } catch {} }, []);
+  useEffect(() => { if (!bulk && !logging) restoreBars(); }, [bulk, logging, restoreBars]);
   const dbRef = useRef<DB | null>(null);
 
   useEffect(() => { loadDB().then(d => { dbRef.current = d; setDb(d); }); initNotifications(); }, []);
@@ -62,17 +71,19 @@ export default function App() {
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (backOverride.current && (bulk || logging) && !editing) { backOverride.current(); return true; }
       if (logging) { setLogging(null); return true; }
       if (cooking) { setCooking(false); return true; }
       if (editing) { setEditing(null); return true; }
       if (bulk) { setBulk(null); return true; }
       if (shopReview) { setShopReview(null); return true; }
       if (recipe) { setRecipe(null); return true; }
+      if (page) { setPage(null); return true; }
       if (tab !== 'pantry') { setTab('pantry'); return true; }
       return false;
     });
     return () => sub.remove();
-  }, [editing, recipe, tab, bulk, shopReview, cooking, logging]);
+  }, [editing, recipe, tab, bulk, shopReview, cooking, logging, page]);
 
   if (!db) return <View style={[s.root, { alignItems: 'center', justifyContent: 'center' }]}><ActivityIndicator color={C.primary} size="large" /></View>;
 
@@ -97,7 +108,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" hidden={false} />
       <SafeAreaView style={s.root} edges={['top', 'bottom']}>
         {upd && !editing && !recipe && (
           <View style={s.upd}>
@@ -110,14 +121,12 @@ export default function App() {
         )}
         {!!db.timers?.length && <TimerStrip timers={db.timers} update={update} showRecipe />}
         <View style={{ flex: 1 }}>
-          <View style={[{ flex: 1 }, tab !== 'pantry' && s.hidden]}><Pantry db={db} onOpen={it => setEditing(it)} onAdd={() => setEditing('new')} onReceipt={() => setBulk('receipt')} onBarcode={() => setBulk('barcode')} onLabel={() => setBulk('label')} /></View>
-          <View style={[{ flex: 1 }, tab !== 'recipes' && s.hidden]}><Recipes db={db} update={update} onOpen={setRecipe} active={tab === 'recipes'} /></View>
-          {tab === 'saved' && <Saved db={db} update={update} onOpen={setRecipe} />}
+          <View style={[{ flex: 1 }, tab !== 'pantry' && s.hidden]}><Pantry db={db} onOpen={it => setEditing(it)} onAdd={() => setEditing('new')} onReceipt={() => setBulk('receipt')} onBarcode={() => setBulk('barcode')} onLabel={() => setBulk('label')} onAbout={() => setPage('about')} updateReady={!!upd} /></View>
+          <View style={[{ flex: 1 }, tab !== 'recipes' && s.hidden]}><Recipes db={db} update={update} onOpen={setRecipe} active={tab === 'recipes'} onSaved={() => setPage('saved')} /></View>
           {tab === 'shop' && <Shopping db={db} update={update} onToPantry={(drafts, ids) => setShopReview({ drafts, ids })} />}
           {tab === 'today' && <Today db={db} update={update} onLog={() => setLogging('text')} />}
           {tab === 'people' && <Household db={db} update={update} />}
-          {tab === 'about' && <About db={db} update={update} onUpdateFound={setUpd} />}
-          {!kb && !editing && !bulk && !shopReview && !recipe && !logging && (
+          {!kb && !editing && !bulk && !shopReview && !recipe && !logging && !page && (
             <Pressable onPress={() => setLogging('text')} style={({ pressed }) => [s.fab, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel="Log food">
               <Text style={s.fabT}>🍽  Log food</Text>
             </Pressable>
@@ -125,25 +134,32 @@ export default function App() {
         </View>
         <View style={s.tabs}>
           {TABS.map(t => (
-            <Pressable key={t.k} onPress={() => setTab(t.k)} style={s.tab} accessibilityRole="tab" accessibilityState={{ selected: tab === t.k }}>
+            <Pressable key={t.k} onPress={() => { setPage(null); setTab(t.k); }} style={s.tab} accessibilityRole="tab" accessibilityState={{ selected: tab === t.k }}>
               <Text style={[s.tabI, tab === t.k && { color: C.primary }]}>{t.icon}</Text>
               <Text style={[s.tabL, tab === t.k && { color: C.primary }]}>{t.label}</Text>
             </Pressable>
           ))}
         </View>
+        {page && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
+          <View style={s.pageTop}>
+            <Pressable onPress={() => setPage(null)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back" style={s.pageBack}><Text style={{ fontSize: 20, color: C.ink }}>←</Text></Pressable>
+            <Text style={s.pageT}>{PAGE_TITLE[page]}</Text><View style={{ width: 38 }} />
+          </View>
+          {page === 'saved' ? <Saved db={db} update={update} onOpen={setRecipe} /> : <About db={db} update={update} onUpdateFound={setUpd} />}
+        </SafeAreaView></View>}
         {editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
           <ItemEditor item={editing === 'new' ? null : editing} soonDays={db.settings.soonDays} settings={db.settings} profiles={db.profiles} onSave={saveItem} onDelete={deleteItem} onClose={() => setEditing(null)} />
         </SafeAreaView></View>}
         {bulk && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
           {bulk === 'receipt' ? <ReceiptScan soonDays={db.settings.soonDays} onAdd={ds => addDrafts(ds)} onClose={() => setBulk(null)} />
             : bulk === 'label' ? <LabelScan items={db.items} ctx={null} onDone={saveLabel} onClose={() => setBulk(null)} />
-            : <BarcodeScan soonDays={db.settings.soonDays} onAdd={ds => addDrafts(ds)} onClose={() => setBulk(null)} />}
+            : <BarcodeScan soonDays={db.settings.soonDays} onAdd={ds => addDrafts(ds)} onClose={() => setBulk(null)} backRef={backOverride} />}
         </SafeAreaView></View>}
         {shopReview && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
           <ImportReview title="Add to pantry" subtitle="From your shopping list" drafts={shopReview.drafts} soonDays={db.settings.soonDays} onAdd={ds => addDrafts(ds, shopReview.ids)} onClose={() => setShopReview(null)} />
         </SafeAreaView></View>}
         {logging && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
-          <LogFood db={db} update={update} startScan={logging === 'scan'} onClose={() => setLogging(null)} />
+          <LogFood db={db} update={update} startScan={logging === 'scan'} onClose={() => setLogging(null)} backRef={backOverride} />
         </SafeAreaView></View>}
         {recipe && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
           <RecipeView r={recipe} db={db} update={update} onClose={() => { setCooking(false); setRecipe(null); }} onCook={() => setCooking(true)} />
@@ -164,6 +180,9 @@ const s = StyleSheet.create({
   tabL: { fontSize: 10, fontWeight: '700', color: C.faint, marginTop: 2 },
   fab: { position: 'absolute', left: 16, bottom: 16, backgroundColor: C.accent, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 14, elevation: 6, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
   fabT: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  pageTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.line, backgroundColor: C.card },
+  pageBack: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  pageT: { fontSize: 18, fontWeight: '800', color: C.ink },
   upd: { backgroundColor: C.primary, paddingHorizontal: 16, paddingVertical: 10 },
   updT: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 4 },
   updB: { color: '#fff', fontWeight: '800', fontSize: 15, textDecorationLine: 'underline' },
