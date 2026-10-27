@@ -2,6 +2,7 @@
 // notifications, so remove everything push/badge related from the merged manifest (tools:node="remove").
 // v0.0.4: also removes the inert FirebaseInitProvider and the dead BOOT_COMPLETED/REBOOT/QUICKBOOT intent-filter actions on NotificationsService
 // (the receiver stays: it delivers scheduled local notifications; NOTIFICATION_EVENT and MY_PACKAGE_REPLACED actions are kept).
+// v0.0.5: also removes the inert Firebase Messaging registrars from Firebase's ComponentDiscoveryService (nothing uses FCM).
 // Kept: POST_NOTIFICATIONS, VIBRATE, WAKE_LOCK (local notifications still work). Not requested: SCHEDULE_EXACT_ALARM.
 const { withAndroidManifest } = require('expo/config-plugins');
 
@@ -18,6 +19,8 @@ const PERMISSIONS = [
 const SERVICES = ['expo.modules.notifications.service.ExpoFirebaseMessagingService', 'com.google.firebase.messaging.FirebaseMessagingService'];
 const RECEIVERS = ['com.google.firebase.iid.FirebaseInstanceIdReceiver'];
 const PROVIDERS = ['com.google.firebase.provider.FirebaseInitProvider'];
+const DISCOVERY = 'com.google.firebase.components.ComponentDiscoveryService';
+const REGISTRARS = ['com.google.firebase.messaging.FirebaseMessagingKtxRegistrar', 'com.google.firebase.messaging.FirebaseMessagingRegistrar'];
 const NOTIF_RECEIVER = 'expo.modules.notifications.service.NotificationsService';
 
 module.exports = function withLocalNotificationsOnly(config) {
@@ -33,6 +36,11 @@ module.exports = function withLocalNotificationsOnly(config) {
     app.service = app.service || []; app.receiver = app.receiver || [];
     for (const name of SERVICES) if (!app.service.find(x => x.$['android:name'] === name)) app.service.push({ $: { 'android:name': name, 'tools:node': 'remove' } });
     for (const name of RECEIVERS) if (!app.receiver.find(x => x.$['android:name'] === name)) app.receiver.push({ $: { 'android:name': name, 'tools:node': 'remove' } });
+    // drop only the Messaging registrar meta-data from the merged discovery service (merge, then remove those children)
+    let disc = app.service.find(x => x.$['android:name'] === DISCOVERY);
+    if (!disc) { disc = { $: { 'android:name': DISCOVERY, 'tools:node': 'merge' } }; app.service.push(disc); }
+    disc['meta-data'] = (disc['meta-data'] || []).filter(x => !REGISTRARS.some(r => x.$['android:name'] === 'com.google.firebase.components:' + r));
+    for (const r of REGISTRARS) disc['meta-data'].push({ $: { 'android:name': 'com.google.firebase.components:' + r, 'tools:node': 'remove' } });
     app.provider = app.provider || [];
     for (const name of PROVIDERS) if (!app.provider.find(x => x.$['android:name'] === name)) app.provider.push({ $: { 'android:name': name, 'tools:node': 'remove' } });
     // replace the library's receiver declaration with one that has no boot actions

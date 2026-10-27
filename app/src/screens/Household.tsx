@@ -16,7 +16,7 @@ export default function Household({ db, update }: { db: DB; update: (f: (d: DB) 
     update(d => { const p = newProfile(n, guest); return { ...d, profiles: [...d.profiles, p], eatingIds: d.eatingIds && !guest ? [...d.eatingIds, p.id] : d.eatingIds }; }); setNewName('');
   };
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96 }} keyboardShouldPersistTaps="handled">
       <Text style={s.h1}>Household</Text>
       <Text style={s.sub}>Add the people you cook for, and guests you sometimes host. Pick who's eating on the Recipes tab; suggestions skip anything those people can't have or don't like.</Text>
       <View style={s.addRow}>
@@ -102,7 +102,7 @@ const LIMIT_FIELDS: { k: GoalNutrient; label: string; unit: string; fda: string 
 const fmt = (v: number | null | undefined) => (v == null ? '' : String(v));
 const numOrNull = (t: string) => { const n = Number(t.replace(',', '.')); return t.trim() === '' || !Number.isFinite(n) || n < 0 ? null : Math.round(n * 10) / 10; };
 
-/** Per-person daily limits (FDA defaults) and optional dated goals. Stored now; intake tracking (v0.05) will use them. */
+/** Per-person daily limits (FDA defaults) and optional dated goals. Used by the Intake tab and the warnings when you log food. */
 function LimitsEditor({ p, setP }: { p: Profile; setP: (f: (p: Profile) => Profile) => void }) {
   const [open, setOpen] = useState(false);
   const [txt, setTxt] = useState<Record<string, string>>(() => Object.fromEntries(LIMIT_FIELDS.map(f => [f.k, fmt(p.limits[f.k])])));
@@ -118,7 +118,7 @@ function LimitsEditor({ p, setP }: { p: Profile; setP: (f: (p: Profile) => Profi
         {!open && <Text style={s.tinyL}>{summary}</Text>}
       </Pressable>
       {open && <View>
-        <Text style={s.tinyL}>Used by intake tracking and warnings in a later version. Leave a box empty for no limit.</Text>
+        <Text style={s.tinyL}>Used by the Intake tab and the warnings when you log food. A dated goal that is stricter than the limit takes over while it is active. Leave a box empty for no limit.</Text>
         {LIMIT_FIELDS.map(f => (
           <View key={f.k} style={s.limRow}>
             <View style={{ flex: 1 }}><Text style={s.limL}>{f.label}</Text><Text style={s.tiny}>{f.fda}</Text></View>

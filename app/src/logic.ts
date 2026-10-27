@@ -268,6 +268,15 @@ export function migrate(raw: any): DB {
   if (db.settings.flagOverrides && typeof db.settings.flagOverrides === 'object') for (const [k, v] of Object.entries<any>(db.settings.flagOverrides)) if (typeof v === 'boolean') fo[k] = v;
   db.settings.flagOverrides = fo;
   db.items = db.items.map(i => (i.nutrition && typeof i.nutrition === 'object' && i.nutrition.nutrients && typeof i.nutrition.nutrients === 'object' ? i : { ...i, nutrition: null }));
+  // v0.0.5: intake log. Keep only well-formed entries; clean the optional detail fields.
+  const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
+  db.intake = (db.intake as any[]).filter(e => e && typeof e.id === 'string' && Number.isFinite(e.at) && typeof e.label === 'string').map((e: any) => ({
+    ...e, servings: Number.isFinite(e.servings) && e.servings >= 0 ? e.servings : 1, meal: MEALS.includes(e.meal) ? e.meal : undefined,
+    calories: Number.isFinite(e.calories) ? e.calories : null,
+    nutrients: e.nutrients && typeof e.nutrients === 'object' ? e.nutrients : undefined,
+  }));
+  db.logPeopleIds = Array.isArray(db.logPeopleIds) ? db.logPeopleIds.filter((x: any) => typeof x === 'string') : [];
+  if (typeof db.settings.logLowersPantry !== 'boolean') db.settings.logLowersPantry = true;
   if (!Array.isArray(db.eatingIds)) db.eatingIds = null;
   if (!db.categoryOffset || typeof db.categoryOffset !== 'object') db.categoryOffset = {};
   db.schema = SCHEMA_VERSION;

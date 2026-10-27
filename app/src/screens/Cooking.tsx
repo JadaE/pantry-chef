@@ -4,8 +4,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, PanResponder, Modal, ToastAndroid } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
-import type { DB, RecipeDetail, CookProgress } from '../types';
-import { buildShopping, newId, recipeCoverage, pantryNames, splitSteps } from '../logic';
+import type { DB, RecipeDetail, CookProgress, IntakeEntry } from '../types';
+import { buildShopping, eaters, newId, recipeCoverage, pantryNames, splitSteps } from '../logic';
+import { mealForHour, servingsText } from '../intake';
 import { applyUsed, clampStep, levelFor, LEVELS, stepSegments, usedFromPantry, UsedRow } from '../cooking';
 import { startTimer } from '../timers';
 import { C } from '../theme';
@@ -134,11 +135,32 @@ function Used({ r, db, update, onDone, onBack }: { r: RecipeDetail; db: DB; upda
   const [rows, setRows] = useState<UsedRow[]>(() => usedFromPantry(r, db.items));
   const n = rows.filter(x => x.ticked).length;
   const set = (i: number, p: Partial<UsedRow>) => setRows(rs => rs.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  // "Log this meal": the selected eaters (same selection as on Recipes) share the servings eaten, split evenly. Recipes carry no nutrition data.
+  const who = useMemo(() => eaters(db.profiles, db.eatingIds), []); // eslint-disable-line
+  const [eaten, setEaten] = useState(Math.max(1, who.length));
+  const [logged, setLogged] = useState(false);
+  const logMeal = () => {
+    const per = Math.round((eaten / Math.max(1, who.length)) * 100) / 100; const at = Date.now(); const meal = mealForHour(new Date().getHours());
+    const es: IntakeEntry[] = (who.length ? who : [undefined]).map(p => ({ id: newId() + Math.random().toString(36).slice(2, 5), at, profileId: p?.id, recipeId: r.id, label: r.name, servings: per, amountText: servingsText(per), meal, calories: null, noNutrition: true }));
+    update(d => ({ ...d, intake: [...es, ...d.intake], logPeopleIds: who.length ? who.map(p => p.id) : d.logPeopleIds })); setLogged(true);
+    toast(`Logged ${r.name}${who.length > 1 ? ` for ${who.length} people` : ''}`);
+  };
   const apply = () => { update(d => ({ ...d, items: applyUsed(d.items, rows) })); toast(n ? `Updated ${n} pantry item${n === 1 ? '' : 's'}` : 'Pantry unchanged'); onDone(); };
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={s.top}><IconBtn a11y="Back to the steps" label="←" onPress={onBack} /><Text style={s.topT}>All done 🎉</Text><View style={{ width: 38 }} /></View>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+        <View style={s.logCard}>
+          <Text style={s.uname}>🍽 Log this meal</Text>
+          <Text style={s.usub}>{who.length ? `For ${who.map(p => p.name).join(', ')}` : 'No people are selected, so it is logged without a person'} · servings are split evenly · no nutrition data for recipes</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+            <IconBtn label="−" a11y="Fewer servings eaten" onPress={() => setEaten(Math.max(0.5, eaten - 0.5))} />
+            <Text style={s.logN}>{eaten}</Text>
+            <IconBtn label="＋" a11y="More servings eaten" onPress={() => setEaten(eaten + 0.5)} />
+            <Text style={[s.usub, { flex: 1, marginLeft: 10 }]}>servings eaten in total</Text>
+            <Btn label={logged ? '✓ Logged' : 'Log it'} onPress={logMeal} disabled={logged} small />
+          </View>
+        </View>
         <Text style={s.h1}>Used from your pantry</Text>
         {rows.length ? <Text style={s.sub}>Ticked items are updated. Tap how much is left. Untick anything you didn't actually use.</Text>
           : <Text style={s.sub}>None of the ingredients matched something in your pantry, so there's nothing to update.</Text>}
@@ -189,6 +211,7 @@ const s = StyleSheet.create({
   bar: { flexDirection: 'row', padding: 12, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.line },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { backgroundColor: C.bg, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 24 },
+  logCard: { backgroundColor: C.accentSoft, borderRadius: 16, padding: 14, marginBottom: 16 }, logN: { fontSize: 22, fontWeight: '800', color: C.ink, minWidth: 40, textAlign: 'center' },
   urow: { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.line, padding: 12, marginBottom: 10 },
   uname: { fontSize: 17, fontWeight: '800', color: C.ink }, usub: { fontSize: 13, color: C.sub, marginTop: 2 },
   lv: { flexDirection: 'row', marginTop: 10 },

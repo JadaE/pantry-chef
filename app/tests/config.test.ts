@@ -4,7 +4,8 @@ import { SITE, UPDATE_URL, CONFIGURED } from '../src/config';
 import { OFF_UA } from '../src/off';
 assert.ok(SITE.startsWith('https://') && SITE.endsWith('.here.now/'));
 assert.ok(UPDATE_URL.startsWith(SITE) && UPDATE_URL.endsWith('/version.json'));
-assert.ok(OFF_UA.startsWith('PantryChef/') && OFF_UA.includes(SITE));
+assert.equal(OFF_UA, 'PantryChef/0.0.5 (Android)'); // generic: no URL, slug or contact (also catches a stale version string)
+assert.ok(!/https?:|here\.now|\.com/.test(OFF_UA) && !OFF_UA.includes(SITE));
 // App code must never import config.local.json (Metro would bake keystorePassword etc. into the bundle)
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
