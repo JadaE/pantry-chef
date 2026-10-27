@@ -1,0 +1,17 @@
+apply plugin: 'com.android.library'
+group = 'com.pantrychef.receiptocr'
+version = '0.1.0'
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useDefaultAndroidSdkVersions()
+android {
+  namespace "com.pantrychef.receiptocr"
+  defaultConfig { versionCode 1; versionName "0.1.0" }
+  lintOptions { abortOnError false }
+}
+dependencies {
+  // bundled model (~4 MB): no runtime model download, works without Google Play Services
+  implementation 'com.google.mlkit:text-recognition:16.0.1'
+}
