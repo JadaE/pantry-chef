@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 # Stage the install page + APK for one version under its secret path, and point the stable update channel at it.
+# Stages INTO the existing site folder named by publishSiteDir in app/config.local.json (the folder that already holds the older APKs,
+# install page and update channel). Refuses if that key is missing/relative or the folder isn't the real site.
 # Usage: NOTES="what's new" bash tools/make_site.sh   (reads version from app/app.json). Pattern from photo-cleanup/android.
+#   DRY_RUN=1  stage into a temporary COPY of the site folder instead (the real folder is not touched); prints where.
+#   STAGE_TO=<dir>  (used by publish.sh) stage into this pre-made copy.
 set -euo pipefail
-D=/workspace/pantry-chef; CFG=$D/keys/site-config.json; SITE=$D/publish-site
-SLUG=$(jq -r .slug $CFG); INST=$(jq -r .install_path $CFG); UPD=$(jq -r .update_channel_path $CFG)
+D=$(cd "$(dirname "$0")/.." && pwd)
+. "$D/tools/site-common.sh"; load_site_config
+SITE=$SITE_REAL
+if [ -n "${STAGE_TO:-}" ]; then SITE=$STAGE_TO; validate_site_dir "$SITE" STAGE_TO
+elif [ "${DRY_RUN:-}" = 1 ]; then SITE=$(mktemp -d /tmp/pc-site-dryrun.XXXXXX); cp -a "$SITE_REAL"/. "$SITE"/; echo "DRY_RUN: staging into a temp copy $SITE (real site folder untouched)"; fi
 V=$(node -e "console.log(require('$D/app/app.json').expo.version)"); VC=$(node -e "console.log(require('$D/app/app.json').expo.android.versionCode)")
-APK=PantryChef-v$V.apk; mkdir -p $SITE/$INST $SITE/$UPD; cp $D/dist/$APK $SITE/$INST/
+APK=PantryChef-v$V.apk; [ -f $D/dist/$APK ] || { echo "dist/$APK not found: run build-apk.sh first" >&2; exit 1; }
+bash $D/tools/apk-leak-check.sh $D/dist/$APK "$CFG" || { echo "APK leaks private config; NOT staging" >&2; exit 1; }
+mkdir -p $SITE/$INST $SITE/$UPD; cp $D/dist/$APK $SITE/$INST/
 SHA=$(sha256sum $D/dist/$APK | cut -c1-16); SIZE=$(du -m $D/dist/$APK | cut -f1)
 OLDER=""; for f in $(ls $SITE/$INST/PantryChef-v*.apk 2>/dev/null | sort -V); do n=$(basename $f); [ "$n" = "$APK" ] || OLDER+="<a href=\"$n\">$n</a> "; done
 SHOTS=""; if ls $D/screens/site/*.png >/dev/null 2>&1; then mkdir -p $SITE/$INST/shots; cp $D/screens/site/*.png $SITE/$INST/shots/; for f in $SITE/$INST/shots/*.png; do n=$(basename $f); SHOTS+="<a href=\"shots/$n\"><img loading=lazy src=\"shots/$n\" alt=\"\"></a>"; done; fi
@@ -35,4 +44,4 @@ ${OLDER:+<p class="small">Older versions: $OLDER</p>}
 </main></body></html>
 H
 jq -n --argjson vc "$VC" --arg v "$V" --arg url "https://$SLUG.here.now/$INST/$APK" --arg notes "${NOTES:-}" '{versionCode:$vc,versionName:$v,apkUrl:$url,notes:$notes}' > $SITE/$UPD/version.json
-cat $SITE/$UPD/version.json; echo staged $V
+jq "del(.apkUrl)" $SITE/$UPD/version.json; echo "staged $V into $SITE"

@@ -1,6 +1,6 @@
 // Data model. SCHEMA_VERSION bumps when the stored shape changes; logic.migrate() moves old data forward.
 // Fields marked "future" are stored but not used by the v0.0.1 UI yet; they reserve room for later versions.
-export const SCHEMA_VERSION = 2;  // 1: v0.0.1 (profiles). 2: v0.0.2 adds expiryEstimated, brand, OFF nutrition (all optional, no migration needed)
+export const SCHEMA_VERSION = 3;  // 1: v0.0.1 (profiles). 2: v0.0.2 adds expiryEstimated, brand, OFF nutrition (all optional, no migration needed). 3: v0.0.3 adds cookingProgress and timers (optional; migrate() sanitizes them)
 
 export type ISODate = string; // 'YYYY-MM-DD'
 
@@ -89,6 +89,11 @@ export type RecipeSummary = { id: string; name: string; thumb: string; category:
 export type RecipeIngredient = { name: string; measure: string };
 export type RecipeDetail = RecipeSummary & { area: string; instructions: string; ingredients: RecipeIngredient[]; youtube?: string; source?: string; tags?: string[] };
 
+/** Cooking mode progress for one recipe. Removed when you finish or tap 'Start over'. */
+export type CookProgress = { step: number; started: boolean; checked: number[]; at: number };
+/** A running or finished cooking timer. endsAt is an absolute time, so it keeps counting while the app is closed. */
+export type CookTimer = { id: string; recipeId: string; recipeName: string; step: number; label: string; seconds: number; endsAt: number; notifId?: string | null };
+
 export type DB = {
   schema: number;
   items: Item[];
@@ -100,11 +105,12 @@ export type DB = {
   categoryOffset: Record<string, number>; // "refresh" position per recipe category
   shopping: ShoppingItem[];               // future
   intake: IntakeEntry[];                  // future
-  cookingProgress?: Record<string, number>; // future: recipeId -> current step in cooking mode
+  cookingProgress?: Record<string, CookProgress>; // recipeId -> where you are in cooking mode (v0.0.3)
+  timers?: CookTimer[];                            // cooking timers (end times, so they survive leaving the app)
 };
 
 export const DEFAULT_SETTINGS: Settings = { soonDays: 5, assumeStaples: true, warnIngredients: [] };
-export const emptyDB = (): DB => ({ schema: SCHEMA_VERSION, items: [], profiles: [], eatingIds: null, settings: { ...DEFAULT_SETTINGS }, bookmarks: [], dismissedRecipes: [], categoryOffset: {}, shopping: [], intake: [] });
+export const emptyDB = (): DB => ({ schema: SCHEMA_VERSION, items: [], profiles: [], eatingIds: null, settings: { ...DEFAULT_SETTINGS }, bookmarks: [], dismissedRecipes: [], categoryOffset: {}, shopping: [], intake: [], cookingProgress: {}, timers: [] });
 
 export const CATEGORIES = ['Produce', 'Meat & Fish', 'Dairy & Eggs', 'Bakery', 'Pantry', 'Canned', 'Frozen', 'Spices', 'Snacks', 'Drinks', 'Condiments', 'Other'];
 export const UNITS = ['pcs', 'lb', 'oz', 'g', 'kg', 'cup', 'L', 'ml', 'can', 'box', 'bag', 'jar', 'bottle', 'pack', 'dozen'];

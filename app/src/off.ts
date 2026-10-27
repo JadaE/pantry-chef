@@ -1,8 +1,9 @@
 // Open Food Facts barcode lookup (free, open database; no key). They ask apps to send a descriptive User-Agent.
 import type { NutrientAmount, NutritionFacts } from './types';
 import { VERSION_NAME } from './version';
+import { SITE } from './config';
 import { matchGrocery } from './groceries';
-export const OFF_UA = `PantryChef/${VERSION_NAME} (Android; personal sideloaded pantry app; contact via https://YOUR-SITE-SLUG.here.now/)`;
+export const OFF_UA = `PantryChef/${VERSION_NAME} (Android; personal sideloaded pantry app; contact via ${SITE})`;
 const FIELDS = 'code,product_name,product_name_en,generic_name,brands,quantity,categories_tags,image_front_small_url,image_front_url,image_url,nutriments,serving_size,serving_quantity,ingredients_text,ingredients_text_en';
 
 export type OffProduct = { barcode: string; name: string; brand: string | null; category: string; imageUrl: string | null; quantity: string | null; nutrition: NutritionFacts | null; ingredientsText: string | null; recipeName?: string };
