@@ -8,6 +8,8 @@ export PATH=$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH
 ROOT=$(cd "$(dirname "$0")" && pwd); APP=$ROOT/app
 CFG=$APP/config.local.json; [ -f "$CFG" ] || { CFG=$APP/config.example.json; echo "NOTE: app/config.local.json missing, building with config.example.json" >&2; }
 cd $APP
+# The app bundle may only contain slug + updateChannelPath. Never let Metro see config.local.json (keystore password, install path, ...).
+mkdir -p src/generated && jq '{slug, updateChannelPath}' "$CFG" > src/generated/appconfig.json
 AJ=$(node -e "const a=require('./app.json').expo;console.log(a.version+':'+a.android.versionCode)")
 VT=$(node -e "const s=require('fs').readFileSync('src/version.ts','utf8');console.log(s.match(/VERSION_NAME = '([^']+)'/)[1]+':'+s.match(/VERSION_CODE = (\\d+)/)[1])")
 [ "$AJ" = "$VT" ] || { echo "Version mismatch: app.json $AJ vs src/version.ts $VT" >&2; exit 1; }
@@ -45,6 +47,8 @@ cd android
 OUT=app/build/outputs/apk/release/app-release.apk
 BADGE=$($(ls -d $ANDROID_HOME/build-tools/* | tail -1)/aapt2 dump badging $OUT | awk "NR==1")
 echo "$BADGE" | grep -q "versionCode='${AJ##*:}' versionName='${AJ%%:*}'" || { echo "APK version mismatch: $BADGE" >&2; exit 1; }
+# Leak check BEFORE the APK goes to dist/: no keystore password / install path / neverPublishTo slug anywhere inside it.
+bash $ROOT/tools/apk-leak-check.sh "$PWD/$OUT" "$CFG" || { echo "APK contains private config; NOT copying to dist/" >&2; rm -f "$OUT"; exit 1; }
 mkdir -p $ROOT/dist && cp $OUT $ROOT/dist/PantryChef-v$V.apk
 $ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs $ROOT/dist/PantryChef-v$V.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
 ls -la $ROOT/dist

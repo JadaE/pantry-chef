@@ -36,3 +36,4 @@ logs/
 *.mov
 *.zip
 .DS_Store
+app/src/generated/

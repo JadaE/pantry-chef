@@ -60,6 +60,7 @@
           "color": "#2F7D57"
         }
       ],
+      "./plugins/withLocalNotificationsOnly",
       [
         "expo-camera",
         {
