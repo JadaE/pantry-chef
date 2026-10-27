@@ -25,7 +25,7 @@ export default function About({ db, update, onUpdateFound }: { db: DB; update: (
   };
   const setS = (patch: Partial<DB['settings']>) => update(d => ({ ...d, settings: { ...d.settings, ...patch } }));
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96 }}>
       <Text style={s.h1}>About</Text>
       <Card style={{ alignItems: 'center', paddingVertical: 22 }}>
         <Text style={{ fontSize: 48 }}>🥕</Text>
@@ -48,6 +48,10 @@ export default function About({ db, update, onUpdateFound }: { db: DB; update: (
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text style={{ flex: 1, fontSize: 15, color: C.ink }}>Count salt, pepper, oil and water as always on hand</Text>
           <Switch value={db.settings.assumeStaples} onValueChange={v => setS({ assumeStaples: v })} trackColor={{ true: C.primary }} />
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+          <Text style={{ flex: 1, fontSize: 15, color: C.ink }}>Logging food also lowers the amount left in the pantry (you can switch it off on each log)</Text>
+          <Switch value={db.settings.logLowersPantry !== false} onValueChange={v => setS({ logLowersPantry: v })} trackColor={{ true: C.primary }} />
         </View>
         <Btn label="Clear recipe cache" kind="ghost" small style={{ marginTop: 12 }} onPress={async () => { const n = await clearCaches(); Alert.alert('Cache cleared', `${n} cached entries removed. Recipes reload next time you open the tab.`); }} />
       </Card>
@@ -73,6 +77,7 @@ export default function About({ db, update, onUpdateFound }: { db: DB; update: (
         <Text style={s.body}>Your pantry, photos and notes stay on this phone. No account, no ads, no tracking.</Text>
         <Text style={s.body}>The app only goes online to fetch recipe ideas from TheMealDB (free public recipe database; only ingredient names are sent), to look up scanned barcodes on Open Food Facts (free, open product database; only the barcode number is sent) and to check this app's own download page for updates.</Text>
         <Text style={s.body}>Receipt, nutrition label and ingredients photos are read entirely on the phone (Google ML Kit text recognition, offline). Those photos are never sent anywhere and are not added to your pantry; only the text that was read is kept on the item.</Text>
+        <Text style={s.body}>Food you log (what, how much, when, for whom) is stored only on this phone. The microphone is used only while you hold a voice log open, and speech is recognized on the phone itself (Android's offline recognizer): no audio is recorded or sent anywhere, and there is no cloud speech service or account. If your phone can't do that, the mic button is hidden.</Text>
       </Card>
       <Text style={s.small}>{db.items.length} items · {db.bookmarks.length} bookmarks · {db.shopping.length} on shopping list · data format v{db.schema}</Text>
     </ScrollView>

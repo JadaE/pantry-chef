@@ -1,6 +1,7 @@
 // Data model. SCHEMA_VERSION bumps when the stored shape changes; logic.migrate() moves old data forward.
 // Fields marked "future" are stored but not used by the v0.0.1 UI yet; they reserve room for later versions.
-export const SCHEMA_VERSION = 4;  // 4: v0.0.4 adds nutrition label fields (perContainer), settings.flagOverrides; all optional, migrate() sanitizes.
+export const SCHEMA_VERSION = 5;  // 5: v0.0.5 intake log (IntakeEntry gets meal/servings detail, db.logPeopleIds, settings.logLowersPantry); all optional, migrate() sanitizes.
+//  4: v0.0.4 adds nutrition label fields (perContainer), settings.flagOverrides; all optional, migrate() sanitizes.
 //  1: v0.0.1 (profiles). 2: v0.0.2 adds expiryEstimated, brand, OFF nutrition (all optional, no migration needed). 3: v0.0.3 adds cookingProgress and timers (optional; migrate() sanitizes them)
 
 export type ISODate = string; // 'YYYY-MM-DD'
@@ -53,6 +54,7 @@ export type Item = {
 export type Settings = {
   soonDays: number;              // "expiring soon" window
   assumeStaples: boolean;        // treat salt, pepper, water, oil as on hand for recipes
+  logLowersPantry?: boolean;     // v0.0.5: logging food also lowers the pantry item's amount left (default on)
   warnIngredients: string[];     // household watch list: extra words to flag when a label's ingredients contain them (v0.0.4)
   flagOverrides?: Record<string, boolean>; // v0.0.4: built-in ingredient flag rules switched on/off (rule id -> on). Missing = rule's default.
 };
@@ -85,9 +87,23 @@ export type Profile = {
 
 /** future: shopping list built from recipe missing ingredients */
 export type ShoppingItem = { id: string; name: string; measure?: string; fromRecipeId?: string; fromRecipeName?: string; checked: boolean; addedAt: number };
-/** future: what was eaten, for calorie / %DV tracking */
-export type IntakeEntry = { id: string; at: number; profileId?: string; itemId?: string; recipeId?: string; label: string; servings: number; calories?: number | null; nutrients?: Record<string, NutrientAmount> };
-
+/** What was eaten (v0.0.5). `nutrients`/`calories` are the TOTAL for this entry (already multiplied by servings); no `nutrients` = "no nutrition data". */
+export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export type IntakeEntry = {
+  id: string;
+  at: number;                 // when it was eaten (ms). The day is the local calendar day of this time.
+  profileId?: string;         // who ate it (none = nobody picked / no people added)
+  itemId?: string;            // pantry item (may be deleted later; label stays)
+  recipeId?: string;
+  label: string;
+  servings: number;           // servings of the item (1 = one label serving)
+  amountText?: string;        // e.g. "2 servings", "half the package", "1.5 cup"
+  meal?: Meal;
+  calories?: number | null;
+  nutrients?: Record<string, NutrientAmount>;
+  noNutrition?: boolean;      // logged without nutrition data (shown as "no nutrition data")
+  assumed?: string;           // how the amount was guessed, e.g. "assumed 100 g per serving"
+};
 export type RecipeSummary = { id: string; name: string; thumb: string; category: string };
 export type RecipeIngredient = { name: string; measure: string };
 export type RecipeDetail = RecipeSummary & { area: string; instructions: string; ingredients: RecipeIngredient[]; youtube?: string; source?: string; tags?: string[] };
@@ -107,13 +123,14 @@ export type DB = {
   dismissedRecipes: string[];             // recipe ids hidden from suggestions
   categoryOffset: Record<string, number>; // "refresh" position per recipe category
   shopping: ShoppingItem[];               // future
-  intake: IntakeEntry[];                  // future
+  intake: IntakeEntry[];                  // v0.0.5: food log
+  logPeopleIds?: string[];                // v0.0.5: who the last log was for (default for the next one)
   cookingProgress?: Record<string, CookProgress>; // recipeId -> where you are in cooking mode (v0.0.3)
   timers?: CookTimer[];                            // cooking timers (end times, so they survive leaving the app)
 };
 
-export const DEFAULT_SETTINGS: Settings = { soonDays: 5, assumeStaples: true, warnIngredients: [], flagOverrides: {} };
-export const emptyDB = (): DB => ({ schema: SCHEMA_VERSION, items: [], profiles: [], eatingIds: null, settings: { ...DEFAULT_SETTINGS, flagOverrides: {} }, bookmarks: [], dismissedRecipes: [], categoryOffset: {}, shopping: [], intake: [], cookingProgress: {}, timers: [] });
+export const DEFAULT_SETTINGS: Settings = { soonDays: 5, assumeStaples: true, warnIngredients: [], flagOverrides: {}, logLowersPantry: true };
+export const emptyDB = (): DB => ({ schema: SCHEMA_VERSION, items: [], profiles: [], eatingIds: null, settings: { ...DEFAULT_SETTINGS, flagOverrides: {} }, logPeopleIds: [], bookmarks: [], dismissedRecipes: [], categoryOffset: {}, shopping: [], intake: [], cookingProgress: {}, timers: [] });
 
 export const CATEGORIES = ['Produce', 'Meat & Fish', 'Dairy & Eggs', 'Bakery', 'Pantry', 'Canned', 'Frozen', 'Spices', 'Snacks', 'Drinks', 'Condiments', 'Other'];
 export const UNITS = ['pcs', 'lb', 'oz', 'g', 'kg', 'cup', 'L', 'ml', 'can', 'box', 'bag', 'jar', 'bottle', 'pack', 'dozen'];

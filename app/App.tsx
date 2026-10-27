@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, BackHandler, AppState, ActivityIndicator, ToastAndroid } from 'react-native';
+import { View, Text, Pressable, StyleSheet, BackHandler, AppState, ActivityIndicator, ToastAndroid, Keyboard } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import type { DB, Item, RecipeDetail } from './src/types';
@@ -25,10 +25,12 @@ import { initNotifications, pruneTimers } from './src/timers';
 import Saved from './src/screens/Saved';
 import About from './src/screens/About';
 import Household from './src/screens/Household';
+import Today from './src/screens/Today';
+import LogFood from './src/screens/LogFood';
 
-type Tab = 'pantry' | 'recipes' | 'saved' | 'shop' | 'people' | 'about';
+type Tab = 'pantry' | 'recipes' | 'saved' | 'shop' | 'today' | 'people' | 'about';
 const TABS: { k: Tab; icon: string; label: string }[] = [
-  { k: 'pantry', icon: '🧺', label: 'Pantry' }, { k: 'recipes', icon: '🍳', label: 'Recipes' }, { k: 'saved', icon: '★', label: 'Saved' }, { k: 'shop', icon: '🛒', label: 'Shopping' }, { k: 'people', icon: '👥', label: 'People' }, { k: 'about', icon: 'ⓘ', label: 'About' },
+  { k: 'pantry', icon: '🧺', label: 'Pantry' }, { k: 'recipes', icon: '🍳', label: 'Recipes' }, { k: 'saved', icon: '★', label: 'Saved' }, { k: 'shop', icon: '🛒', label: 'Shopping' }, { k: 'today', icon: '📊', label: 'Intake' }, { k: 'people', icon: '👥', label: 'People' }, { k: 'about', icon: 'ⓘ', label: 'About' },
 ];
 
 export default function App() {
@@ -39,6 +41,8 @@ export default function App() {
   const [upd, setUpd] = useState<UpdateInfo | null>(null);
   const [bulk, setBulk] = useState<'receipt' | 'barcode' | 'label' | null>(null);
   const [cooking, setCooking] = useState(false);
+  const [logging, setLogging] = useState<null | 'text' | 'scan'>(null);
+  const [kb, setKb] = useState(false);
   const [shopReview, setShopReview] = useState<{ drafts: Draft[]; ids: string[] } | null>(null);
   const dbRef = useRef<DB | null>(null);
 
@@ -46,6 +50,7 @@ export default function App() {
   const update = useCallback((f: (d: DB) => DB) => { const cur = dbRef.current; if (!cur) return; const n = f(cur); dbRef.current = n; setDb(n); saveDB(n); }, []);
 
   useEffect(() => { if (db) pruneTimers(update); }, [!!db]); // eslint-disable-line
+  useEffect(() => { const a = Keyboard.addListener('keyboardDidShow', () => setKb(true)), b = Keyboard.addListener('keyboardDidHide', () => setKb(false)); return () => { a.remove(); b.remove(); }; }, []);
 
   // update check on launch (throttled to every 6h inside checkForUpdate) and when the app comes back to the foreground
   useEffect(() => {
@@ -57,6 +62,7 @@ export default function App() {
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (logging) { setLogging(null); return true; }
       if (cooking) { setCooking(false); return true; }
       if (editing) { setEditing(null); return true; }
       if (bulk) { setBulk(null); return true; }
@@ -66,7 +72,7 @@ export default function App() {
       return false;
     });
     return () => sub.remove();
-  }, [editing, recipe, tab, bulk, shopReview, cooking]);
+  }, [editing, recipe, tab, bulk, shopReview, cooking, logging]);
 
   if (!db) return <View style={[s.root, { alignItems: 'center', justifyContent: 'center' }]}><ActivityIndicator color={C.primary} size="large" /></View>;
 
@@ -108,8 +114,14 @@ export default function App() {
           <View style={[{ flex: 1 }, tab !== 'recipes' && s.hidden]}><Recipes db={db} update={update} onOpen={setRecipe} active={tab === 'recipes'} /></View>
           {tab === 'saved' && <Saved db={db} update={update} onOpen={setRecipe} />}
           {tab === 'shop' && <Shopping db={db} update={update} onToPantry={(drafts, ids) => setShopReview({ drafts, ids })} />}
+          {tab === 'today' && <Today db={db} update={update} onLog={() => setLogging('text')} />}
           {tab === 'people' && <Household db={db} update={update} />}
           {tab === 'about' && <About db={db} update={update} onUpdateFound={setUpd} />}
+          {!kb && !editing && !bulk && !shopReview && !recipe && !logging && (
+            <Pressable onPress={() => setLogging('text')} style={({ pressed }) => [s.fab, pressed && { opacity: 0.8 }]} accessibilityRole="button" accessibilityLabel="Log food">
+              <Text style={s.fabT}>🍽  Log food</Text>
+            </Pressable>
+          )}
         </View>
         <View style={s.tabs}>
           {TABS.map(t => (
@@ -130,6 +142,9 @@ export default function App() {
         {shopReview && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
           <ImportReview title="Add to pantry" subtitle="From your shopping list" drafts={shopReview.drafts} soonDays={db.settings.soonDays} onAdd={ds => addDrafts(ds, shopReview.ids)} onClose={() => setShopReview(null)} />
         </SafeAreaView></View>}
+        {logging && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
+          <LogFood db={db} update={update} startScan={logging === 'scan'} onClose={() => setLogging(null)} />
+        </SafeAreaView></View>}
         {recipe && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
           <RecipeView r={recipe} db={db} update={update} onClose={() => { setCooking(false); setRecipe(null); }} onCook={() => setCooking(true)} />
         </SafeAreaView></View>}
@@ -146,7 +161,9 @@ const s = StyleSheet.create({
   tabs: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: C.line, backgroundColor: C.card, paddingBottom: 4 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 8 },
   tabI: { fontSize: 20, color: C.faint },
-  tabL: { fontSize: 11, fontWeight: '700', color: C.faint, marginTop: 2 },
+  tabL: { fontSize: 10, fontWeight: '700', color: C.faint, marginTop: 2 },
+  fab: { position: 'absolute', left: 16, bottom: 16, backgroundColor: C.accent, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 14, elevation: 6, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
+  fabT: { color: '#fff', fontWeight: '800', fontSize: 16 },
   upd: { backgroundColor: C.primary, paddingHorizontal: 16, paddingVertical: 10 },
   updT: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 4 },
   updB: { color: '#fff', fontWeight: '800', fontSize: 15, textDecorationLine: 'underline' },
