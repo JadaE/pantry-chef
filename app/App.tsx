@@ -18,6 +18,9 @@ import Pantry from './src/screens/Pantry';
 import ItemEditor from './src/screens/ItemEditor';
 import Recipes from './src/screens/Recipes';
 import RecipeView from './src/screens/RecipeView';
+import Cooking from './src/screens/Cooking';
+import TimerStrip from './src/screens/TimerStrip';
+import { initNotifications, pruneTimers } from './src/timers';
 import Saved from './src/screens/Saved';
 import About from './src/screens/About';
 import Household from './src/screens/Household';
@@ -34,11 +37,14 @@ export default function App() {
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [upd, setUpd] = useState<UpdateInfo | null>(null);
   const [bulk, setBulk] = useState<'receipt' | 'barcode' | null>(null);
+  const [cooking, setCooking] = useState(false);
   const [shopReview, setShopReview] = useState<{ drafts: Draft[]; ids: string[] } | null>(null);
   const dbRef = useRef<DB | null>(null);
 
-  useEffect(() => { loadDB().then(d => { dbRef.current = d; setDb(d); }); }, []);
+  useEffect(() => { loadDB().then(d => { dbRef.current = d; setDb(d); }); initNotifications(); }, []);
   const update = useCallback((f: (d: DB) => DB) => { const cur = dbRef.current; if (!cur) return; const n = f(cur); dbRef.current = n; setDb(n); saveDB(n); }, []);
+
+  useEffect(() => { if (db) pruneTimers(update); }, [!!db]); // eslint-disable-line
 
   // update check on launch (throttled to every 6h inside checkForUpdate) and when the app comes back to the foreground
   useEffect(() => {
@@ -50,6 +56,7 @@ export default function App() {
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (cooking) { setCooking(false); return true; }
       if (editing) { setEditing(null); return true; }
       if (bulk) { setBulk(null); return true; }
       if (shopReview) { setShopReview(null); return true; }
@@ -58,7 +65,7 @@ export default function App() {
       return false;
     });
     return () => sub.remove();
-  }, [editing, recipe, tab, bulk, shopReview]);
+  }, [editing, recipe, tab, bulk, shopReview, cooking]);
 
   if (!db) return <View style={[s.root, { alignItems: 'center', justifyContent: 'center' }]}><ActivityIndicator color={C.primary} size="large" /></View>;
 
@@ -86,6 +93,7 @@ export default function App() {
             </View>
           </View>
         )}
+        {!!db.timers?.length && <TimerStrip timers={db.timers} update={update} showRecipe />}
         <View style={{ flex: 1 }}>
           <View style={[{ flex: 1 }, tab !== 'pantry' && s.hidden]}><Pantry db={db} onOpen={it => setEditing(it)} onAdd={() => setEditing('new')} onReceipt={() => setBulk('receipt')} onBarcode={() => setBulk('barcode')} /></View>
           <View style={[{ flex: 1 }, tab !== 'recipes' && s.hidden]}><Recipes db={db} update={update} onOpen={setRecipe} active={tab === 'recipes'} /></View>
@@ -113,7 +121,10 @@ export default function App() {
           <ImportReview title="Add to pantry" subtitle="From your shopping list" drafts={shopReview.drafts} soonDays={db.settings.soonDays} onAdd={ds => addDrafts(ds, shopReview.ids)} onClose={() => setShopReview(null)} />
         </SafeAreaView></View>}
         {recipe && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
-          <RecipeView r={recipe} db={db} update={update} onClose={() => setRecipe(null)} />
+          <RecipeView r={recipe} db={db} update={update} onClose={() => { setCooking(false); setRecipe(null); }} onCook={() => setCooking(true)} />
+        </SafeAreaView></View>}
+        {recipe && cooking && !editing && <View style={StyleSheet.absoluteFill}><SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
+          <Cooking r={recipe} db={db} update={update} onClose={() => setCooking(false)} />
         </SafeAreaView></View>}
       </SafeAreaView>
     </SafeAreaProvider>

@@ -239,6 +239,14 @@ export function migrate(raw: any): DB {
     guest: false, dislikes: [], restrictions: [], goals: [], createdAt: Date.now(), ...p, limits: { ...FDA_DEFAULT_LIMITS, ...(p.limits || {}) },
   })) : [];
   for (const k of ['bookmarks', 'dismissedRecipes', 'shopping', 'intake'] as const) if (!Array.isArray((db as any)[k])) (db as any)[k] = [];
+  // v0.0.3: cooking progress + timers (both optional; anything malformed is dropped)
+  const cp: Record<string, any> = {};
+  if (raw.cookingProgress && typeof raw.cookingProgress === 'object') for (const [k, v] of Object.entries<any>(raw.cookingProgress)) {
+    if (typeof v === 'number') cp[k] = { step: Math.max(0, Math.floor(v)), started: true, checked: [], at: Date.now() };
+    else if (v && typeof v.step === 'number') cp[k] = { step: Math.max(0, Math.floor(v.step)), started: !!v.started, checked: Array.isArray(v.checked) ? v.checked.filter((x: any) => Number.isInteger(x)) : [], at: Number(v.at) || Date.now() };
+  }
+  db.cookingProgress = cp;
+  db.timers = Array.isArray(raw.timers) ? raw.timers.filter((t: any) => t && typeof t.id === 'string' && typeof t.endsAt === 'number' && typeof t.seconds === 'number').slice(0, 30) : [];
   if (!Array.isArray(db.eatingIds)) db.eatingIds = null;
   if (!db.categoryOffset || typeof db.categoryOffset !== 'object') db.categoryOffset = {};
   db.schema = SCHEMA_VERSION;
