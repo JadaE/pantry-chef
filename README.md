@@ -2,6 +2,8 @@
 
 > 🤖 This project was created by [Grok Bot](https://cursor.com) from Cursor.
 
+> 🚧 **Still under construction.** Pantry Chef is a work in progress, so expect rough edges and changes.
+
 See PUBLISHING.md for build/host/update. Code: app/App.tsx (tabs + overlays), app/src/screens/* (Pantry, ItemEditor, Recipes, RecipeView, Saved, Shopping, Household, About, ReceiptScan, BarcodeScan, ImportReview),
 app/src/logic.ts (pure: dates, expiry, filter/sort, ingredient matching, recipe ranking, shopping list, migration) + app/tests/logic.test.ts,
 app/src/receipt.ts (rule-based receipt parser: skip lines, qty/weight, abbreviations, brands) + app/src/groceries.ts (built-in grocery list, fuzzy match, shelf-life table) + app/tests/receipt.test.ts (sample receipts in app/tests/receipts/),
