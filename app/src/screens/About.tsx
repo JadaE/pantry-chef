@@ -74,7 +74,7 @@ export default function About({ db, update, onUpdateFound }: { db: DB; update: (
       <Label>Privacy</Label>
       <Card>
         <Text style={s.body}>Your pantry, photos and notes stay on this phone. No account, no ads, no tracking.</Text>
-        <Text style={s.body}>The app only goes online to fetch recipe ideas from TheMealDB (free public recipe database; only ingredient names are sent), to look up scanned barcodes on Open Food Facts (free, open product database; only the barcode number is sent) and to check this app's own download page for updates.</Text>
+        <Text style={s.body}>The app only goes online to fetch recipe ideas from TheMealDB (free public recipe database; only ingredient names are sent), to look up scanned barcodes on Open Food Facts (free, open product database; only the barcode number is sent) and to check the app's public GitHub releases page for a newer version (a plain request; nothing about you is sent).</Text>
         <Text style={s.body}>Receipt, nutrition label and ingredients photos are read entirely on the phone (Google ML Kit text recognition, offline). Those photos are never sent anywhere and are not added to your pantry; only the text that was read is kept on the item.</Text>
         <Text style={s.body}>Food you log (what, how much, when, for whom) is stored only on this phone. The microphone listens only after you tap the mic, until you tap it again or recognition ends. Speech is recognized on the phone itself (Android's offline recognizer): no audio is recorded or sent anywhere, and there is no cloud speech service or account. If your phone can't do that, the mic button is hidden.</Text>
       </Card>

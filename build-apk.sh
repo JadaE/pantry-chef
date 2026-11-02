@@ -8,13 +8,16 @@ export PATH=$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH
 ROOT=$(cd "$(dirname "$0")" && pwd); APP=$ROOT/app
 CFG=$APP/config.local.json; [ -f "$CFG" ] || { CFG=$APP/config.example.json; echo "NOTE: app/config.local.json missing, building with config.example.json" >&2; }
 cd $APP
-# The app bundle may only contain slug + updateChannelPath. Never let Metro see config.local.json (keystore password, install path, ...).
-mkdir -p src/generated && jq '{slug, updateChannelPath}' "$CFG" > src/generated/appconfig.json
+# v0.0.7+: the app bundle holds NO deploy values (updates come from public GitHub Releases, see src/config.ts). Never let Metro see
+# config.local.json (keystore password, here.now slug / secret paths). Remove the old generated file if a previous build left one.
+rm -rf src/generated
 AJ=$(node -e "const a=require('./app.json').expo;console.log(a.version+':'+a.android.versionCode)")
 VT=$(node -e "const s=require('fs').readFileSync('src/version.ts','utf8');console.log(s.match(/VERSION_NAME = '([^']+)'/)[1]+':'+s.match(/VERSION_CODE = (\\d+)/)[1])")
 [ "$AJ" = "$VT" ] || { echo "Version mismatch: app.json $AJ vs src/version.ts $VT" >&2; exit 1; }
+# Update check derives versionCode from the release tag vX.Y.Z, so enforce versionCode = X*10000 + Y*100 + Z.
+node -e "const [n,c]=process.argv[1].split(':');const m=n.split('.').map(Number);process.exit(m[0]*10000+m[1]*100+m[2]===Number(c)?0:1)" "$AJ" || { echo "versionCode must equal X*10000+Y*100+Z for version $AJ" >&2; exit 1; }
 V=${AJ%%:*}
-npx tsc --noEmit -p . && npx tsx tests/logic.test.ts | tail -1 && npx tsx tests/receipt.test.ts | tail -1 && npx tsx tests/config.test.ts | tail -1 && npx tsx tests/cooking.test.ts | tail -1 && npx tsx tests/nutrition.test.ts | tail -1 && npx tsx tests/warnings.test.ts | tail -1 && npx tsx tests/intake.test.ts | tail -1 && npx tsx tests/recipesort.test.ts | tail -1
+npx tsc --noEmit -p . && npx tsx tests/logic.test.ts | tail -1 && npx tsx tests/receipt.test.ts | tail -1 && npx tsx tests/config.test.ts | tail -1 && npx tsx tests/cooking.test.ts | tail -1 && npx tsx tests/nutrition.test.ts | tail -1 && npx tsx tests/warnings.test.ts | tail -1 && npx tsx tests/intake.test.ts | tail -1 && npx tsx tests/recipesort.test.ts | tail -1 && npx tsx tests/update.test.ts | tail -1
 # v0.0.6: camera preview as TextureView (see tools/patch-expo-camera.js); also runs on npm install (postinstall)
 node $ROOT/tools/patch-expo-camera.js
 [ -d android ] || npx expo prebuild -p android --no-install

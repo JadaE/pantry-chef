@@ -7,7 +7,7 @@
 const fs = require('fs'); const path = require('path');
 const DIR = path.resolve(__dirname, '..', 'app');
 const f = path.join(DIR, 'node_modules/expo-camera/android/src/main/java/expo/modules/camera/ExpoCameraView.kt');
-if (!fs.existsSync(f)) { console.log('patch-expo-camera: expo-camera not installed yet, skipping'); process.exit(0); }
+if (!fs.existsSync(f)) { console.error('patch-expo-camera: expo-camera not found at ' + path.relative(DIR, f) + ' (run npm install in app/ first)'); process.exit(1); }
 let s = fs.readFileSync(f, 'utf8');
 const MARK = 'PANTRYCHEF_TEXTUREVIEW';
 if (s.includes(MARK)) { console.log('patch-expo-camera: already patched'); process.exit(0); }
