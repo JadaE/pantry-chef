@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { parseRelease, validCached, codeFromName } from '../src/updateParse';
+import { DOWNLOAD_RE } from '../src/config';
+const DOWNLOAD_PREFIX = 'https://github.com/Example-Owner/pantry-chef/releases/download/';
+let n = 0; const t = (name: string, f: () => void) => { f(); n++; };
+const dl = (v: string) => `${DOWNLOAD_PREFIX}v${v}/PantryChef-v${v}.apk`;
+const rel = (o: any = {}) => ({ tag_name: 'v0.0.8', draft: false, prerelease: false, body: 'Faster scanner', assets: [{ name: 'PantryChef-v0.0.8.apk', browser_download_url: dl('0.0.8') }], ...o });
+t('codeFromName', () => { assert.equal(codeFromName('v0.0.7'), 7); assert.equal(codeFromName('0.1.2'), 102); assert.equal(codeFromName('1.0.0'), 10000); assert.equal(codeFromName('v0.0.7-beta'), null); assert.equal(codeFromName(''), null); });
+t('tag gives versionCode', () => { const u = parseRelease(rel(), DOWNLOAD_RE)!; assert.equal(u.versionCode, 8); assert.equal(u.versionName, '0.0.8'); assert.equal(u.apkUrl, dl('0.0.8')); assert.equal(u.notes, 'Faster scanner'); });
+t('body versionCode wins and is removed from notes', () => { const u = parseRelease(rel({ body: 'versionCode: 9\nFixes' }), DOWNLOAD_RE)!; assert.equal(u.versionCode, 9); assert.equal(u.notes, 'Fixes'); });
+t('first .apk asset is used', () => { const u = parseRelease(rel({ assets: [{ name: 'notes.txt', browser_download_url: DOWNLOAD_PREFIX + 'x/notes.txt' }, { name: 'a.apk', browser_download_url: DOWNLOAD_PREFIX + 'v0.0.8/a.apk' }, { name: 'b.apk', browser_download_url: DOWNLOAD_PREFIX + 'v0.0.8/b.apk' }] }), DOWNLOAD_RE)!; assert.ok(u.apkUrl.endsWith('/a.apk')); });
+t('no apk asset -> null', () => assert.equal(parseRelease(rel({ assets: [] }), DOWNLOAD_RE), null));
+t('foreign download host or repo -> null', () => { for (const u of ['https://evil.example/x.apk', 'https://github.com/someone/other-app/releases/download/v1/x.apk', 'https://github.com.evil.example/a/pantry-chef/releases/download/v1/x.apk', 'http://github.com/a/pantry-chef/releases/download/v1/x.apk']) assert.equal(parseRelease(rel({ assets: [{ name: 'x.apk', browser_download_url: u }] }), DOWNLOAD_RE), null, u); });
+t('draft/prerelease/garbage -> null', () => { assert.equal(parseRelease(rel({ draft: true }), DOWNLOAD_RE), null); assert.equal(parseRelease(rel({ prerelease: true }), DOWNLOAD_RE), null); assert.equal(parseRelease(null, DOWNLOAD_RE), null); assert.equal(parseRelease({ message: 'API rate limit exceeded' }, DOWNLOAD_RE), null); assert.equal(parseRelease(rel({ tag_name: 'latest', body: '' }), DOWNLOAD_RE), null); });
+t('cached old here.now value is rejected', () => { assert.equal(validCached({ versionCode: 6, versionName: '0.0.6', apkUrl: 'https://example.here.now/x/a.apk', notes: '' }, DOWNLOAD_RE), null); assert.ok(validCached(parseRelease(rel(), DOWNLOAD_RE), DOWNLOAD_RE)); });
+console.log(`update tests: ${n} passed`);
