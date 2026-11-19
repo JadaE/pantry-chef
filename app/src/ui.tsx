@@ -101,3 +101,59 @@ export function Check({ on, onPress, size = 26 }: { on: boolean; onPress: () => 
     style={{ width: size, height: size, borderRadius: 7, borderWidth: 2, borderColor: on ? C.primary : C.faint, backgroundColor: on ? C.primary : C.card, alignItems: 'center', justifyContent: 'center' }}>
     {on ? <Text style={{ color: '#fff', fontWeight: '900', fontSize: size * 0.6 }}>✓</Text> : null}</Pressable>;
 }
+
+/** 12-hour time picker (pure JS, no native module). hour is 0–23. */
+export function TimePickerModal({ visible, hour, minute, onPick, onClose, title }: { visible: boolean; hour: number; minute: number; onPick: (hour: number, minute: number) => void; onClose: () => void; title?: string }) {
+  const [h, setH] = React.useState(hour);
+  const [m, setM] = React.useState(minute);
+  React.useEffect(() => { if (visible) { setH(((hour % 24) + 24) % 24); setM(((minute % 60) + 60) % 60); } }, [visible, hour, minute]);
+  const am = h < 12;
+  const h12 = h % 12 || 12;
+  const setH12 = (v: number) => {
+    const v12 = ((v - 1 + 12) % 12) + 1;
+    setH(am ? (v12 === 12 ? 0 : v12) : (v12 === 12 ? 12 : v12 + 12));
+  };
+  const toggleAm = () => setH(x => (x + 12) % 24);
+  const setMin = (d: number) => setM(x => (x + d + 60) % 60);
+  const pad = (n: number) => (n < 10 ? '0' : '') + n;
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={s.dpBack} onPress={onClose}>
+        <Pressable style={s.dpBox} onPress={() => {}}>
+          {title ? <Text style={s.dpTitle}>{title}</Text> : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingVertical: 8 }}>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: C.faint, marginBottom: 6 }}>HOUR</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <IconBtn label="‹" a11y="Previous hour" onPress={() => setH12(h12 - 1)} />
+                <Text style={{ fontSize: 32, fontWeight: '800', color: C.ink, width: 56, textAlign: 'center' }}>{h12}</Text>
+                <IconBtn label="›" a11y="Next hour" onPress={() => setH12(h12 + 1)} />
+              </View>
+            </View>
+            <Text style={{ fontSize: 32, fontWeight: '800', color: C.ink }}>:</Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: C.faint, marginBottom: 6 }}>MINUTE</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <IconBtn label="‹" a11y="Previous minute" onPress={() => setMin(-1)} />
+                <Text style={{ fontSize: 32, fontWeight: '800', color: C.ink, width: 56, textAlign: 'center' }}>{pad(m)}</Text>
+                <IconBtn label="›" a11y="Next minute" onPress={() => setMin(1)} />
+              </View>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8 }}>
+            <Pressable onPress={() => { if (!am) toggleAm(); }} style={[s.chip, am && { backgroundColor: C.primary, borderColor: C.primary }]} accessibilityRole="button" accessibilityState={{ selected: am }} accessibilityLabel="AM">
+              <Text style={[s.chipT, am && { color: '#fff' }]}>AM</Text>
+            </Pressable>
+            <Pressable onPress={() => { if (am) toggleAm(); }} style={[s.chip, !am && { backgroundColor: C.primary, borderColor: C.primary }]} accessibilityRole="button" accessibilityState={{ selected: !am }} accessibilityLabel="PM">
+              <Text style={[s.chipT, !am && { color: '#fff' }]}>PM</Text>
+            </Pressable>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 }}>
+            <Btn label="Cancel" kind="ghost" small onPress={onClose} />
+            <Btn label="Set time" kind="soft" small onPress={() => { onPick(h, m); onClose(); }} />
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}

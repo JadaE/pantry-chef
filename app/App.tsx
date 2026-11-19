@@ -22,6 +22,9 @@ import RecipeView from './src/screens/RecipeView';
 import Cooking from './src/screens/Cooking';
 import TimerStrip from './src/screens/TimerStrip';
 import { initNotifications, pruneTimers } from './src/timers';
+import { syncUseSoonReminder, isUseSoonNotification } from './src/reminderSchedule';
+import * as Notifications from 'expo-notifications';
+import type { Filter } from './src/logic';
 import Saved from './src/screens/Saved';
 import About from './src/screens/About';
 import Household from './src/screens/Household';
@@ -48,6 +51,8 @@ export default function App() {
   const [kb, setKb] = useState(false);
   const [shopReview, setShopReview] = useState<{ drafts: Draft[]; ids: string[] } | null>(null);
   const [page, setPage] = useState<Page | null>(null);
+  const [pantryFocus, setPantryFocus] = useState<Filter | null>(null);
+  const [pantryFocusNonce, setPantryFocusNonce] = useState(0);
   /** a screen that needs to clean up before closing (camera screens) can take over the Android back button */
   const backOverride = useRef<null | (() => void)>(null);
   // Make sure the status bar is visible with dark icons whenever we're back on the main screens (v0.0.6).
@@ -57,6 +62,31 @@ export default function App() {
 
   useEffect(() => { loadDB().then(d => { dbRef.current = d; setDb(d); }); initNotifications(); }, []);
   const update = useCallback((f: (d: DB) => DB) => { const cur = dbRef.current; if (!cur) return; const n = f(cur); dbRef.current = n; setDb(n); saveDB(n); }, []);
+
+  const openUseSoon = useCallback(() => {
+    setPage(null); setBulk(null); setEditing(null); setRecipe(null); setLogging(null); setCooking(false); setShopReview(null);
+    setTab('pantry');
+    setPantryFocus('attention');
+    setPantryFocusNonce(n => n + 1);
+  }, []);
+
+  // Reschedule the local Use soon reminder when items/settings change and when the app is opened (see reminderSchedule.ts).
+  useEffect(() => {
+    if (!db) return;
+    const run = () => { if (dbRef.current) syncUseSoonReminder(dbRef.current); };
+    run();
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') run(); });
+    return () => sub.remove();
+  }, [db?.items, db?.settings.remindersEnabled, db?.settings.reminderHour, db?.settings.reminderMinute, db?.settings.soonDays]); // eslint-disable-line
+
+  useEffect(() => {
+    const apply = (r: Notifications.NotificationResponse | null) => {
+      if (r && isUseSoonNotification(r.notification.request.content.data)) openUseSoon();
+    };
+    Notifications.getLastNotificationResponseAsync().then(apply).catch(() => {});
+    const sub = Notifications.addNotificationResponseReceivedListener(apply);
+    return () => sub.remove();
+  }, [openUseSoon]);
 
   useEffect(() => { if (db) pruneTimers(update); }, [!!db]); // eslint-disable-line
   useEffect(() => { const a = Keyboard.addListener('keyboardDidShow', () => setKb(true)), b = Keyboard.addListener('keyboardDidHide', () => setKb(false)); return () => { a.remove(); b.remove(); }; }, []);
@@ -121,7 +151,7 @@ export default function App() {
         )}
         {!!db.timers?.length && <TimerStrip timers={db.timers} update={update} showRecipe />}
         <View style={{ flex: 1 }}>
-          <View style={[{ flex: 1 }, tab !== 'pantry' && s.hidden]}><Pantry db={db} onOpen={it => setEditing(it)} onAdd={() => setEditing('new')} onReceipt={() => setBulk('receipt')} onBarcode={() => setBulk('barcode')} onLabel={() => setBulk('label')} onAbout={() => setPage('about')} updateReady={!!upd} /></View>
+          <View style={[{ flex: 1 }, tab !== 'pantry' && s.hidden]}><Pantry db={db} onOpen={it => setEditing(it)} onAdd={() => setEditing('new')} onReceipt={() => setBulk('receipt')} onBarcode={() => setBulk('barcode')} onLabel={() => setBulk('label')} onAbout={() => setPage('about')} updateReady={!!upd} focusFilter={pantryFocus} focusNonce={pantryFocusNonce} /></View>
           <View style={[{ flex: 1 }, tab !== 'recipes' && s.hidden]}><Recipes db={db} update={update} onOpen={setRecipe} active={tab === 'recipes'} onSaved={() => setPage('saved')} /></View>
           {tab === 'shop' && <Shopping db={db} update={update} onToPantry={(drafts, ids) => setShopReview({ drafts, ids })} />}
           {tab === 'today' && <Today db={db} update={update} onLog={() => setLogging('text')} />}

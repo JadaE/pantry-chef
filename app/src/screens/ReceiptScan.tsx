@@ -18,10 +18,18 @@ export default function ReceiptScan({ soonDays, onAdd, onClose }: Props) {
   const [fromPhoto, setFromPhoto] = useState(false); // true only when the text came from reading a photo
   const [review, setReview] = useState<{ drafts: Draft[]; sub: string } | null>(null);
 
-  const parse = (t: string) => {
+  const parse = (t: string, source: 'photo' | 'text' = 'text') => {
     const r = parseReceipt(t);
     const bought = r.date || todayISO();
-    if (!r.items.length) { setShowText(true); Alert.alert('No items found', 'Pantry Chef could not find grocery lines in this text. Try a sharper, flatter photo, or fix the text below and tap "Find items".'); return; }
+    if (!r.items.length) {
+      setShowText(true);
+      // Wording bug since v0.0.2: the no-items alert always said "try a sharper photo", even when the text was typed or pasted.
+      const tip = source === 'photo'
+        ? 'Try a sharper, flatter photo, or fix the text below and tap "Find items".'
+        : 'Check that each item is on its own line, fix anything that looks wrong, and tap "Find items".';
+      Alert.alert('No items found', `Pantry Chef could not find grocery lines in this text. ${tip}`);
+      return;
+    }
     setReview({ drafts: r.items.map(i => draftFromReceipt(i, bought)), sub: [r.store, r.date ? `bought ${r.date}` : null, `${r.items.length} lines found`].filter(Boolean).join(' · ') });
   };
   const scan = async (camera: boolean) => {
@@ -32,7 +40,7 @@ export default function ReceiptScan({ soonDays, onAdd, onClose }: Props) {
       const rows = rowsFromOcr(res.lines);
       const t = rows.join('\n');
       setText(t); setFromPhoto(true); setBusy(null);
-      parse(t);
+      parse(t, 'photo');
     } catch (e: any) { setBusy(null); Alert.alert('Could not read the receipt', String(e?.message || e)); }
   };
 
@@ -57,7 +65,7 @@ export default function ReceiptScan({ soonDays, onAdd, onClose }: Props) {
         {showText && !busy && <View style={{ marginTop: 14 }}>
           <Text style={s.p}>{text ? (fromPhoto ? 'This is what was read from the photo. Fix anything that looks wrong, then tap Find items.' : 'Check the lines below. Fix anything that looks wrong, then tap Find items.') : 'One item per line, e.g. "GV WHL MLK 3.48".'}</Text>
           <TextInput value={text} onChangeText={setText} multiline style={s.box} placeholder={'GV WHL MLK 3.48\nBANANAS 1.33\n2 @ 0.98\nTOTAL 5.79'} placeholderTextColor={C.faint} autoCapitalize="characters" />
-          <Btn label="Find items" onPress={() => parse(text)} disabled={!text.trim()} style={{ marginTop: 10 }} />
+          <Btn label="Find items" onPress={() => parse(text, fromPhoto ? 'photo' : 'text')} disabled={!text.trim()} style={{ marginTop: 10 }} />
         </View>}
       </ScrollView>
     </View>

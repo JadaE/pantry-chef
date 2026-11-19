@@ -6,8 +6,8 @@ import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 assert.ok(Number.isInteger(UPDATE_REPO_ID) && UPDATE_REPO_ID > 0);
 assert.equal(UPDATE_URL, `https://api.github.com/repositories/${UPDATE_REPO_ID}/releases/latest`);
-assert.ok(DOWNLOAD_RE.test('https://github.com/Owner-1/pantry-chef/releases/download/v0.0.7/PantryChef-v0.0.7.apk') && !DOWNLOAD_RE.test('https://example.com/pantry-chef/releases/download/v1/a.apk'));
-assert.equal(OFF_UA, 'PantryChef/0.0.7 (Android)'); // generic: no URL, slug or contact (also catches a stale version string)
+assert.ok(DOWNLOAD_RE.test('https://github.com/Owner-1/pantry-chef/releases/download/v0.0.8/PantryChef-v0.0.8.apk') && !DOWNLOAD_RE.test('https://example.com/pantry-chef/releases/download/v1/a.apk'));
+assert.equal(OFF_UA, 'PantryChef/0.0.8 (Android)'); // generic: no URL, slug or contact (also catches a stale version string)
 assert.ok(!/https?:|here\.now|\.com/.test(OFF_UA));
 const root = join(__dirname, '..');
 const walk = (d: string): string[] => readdirSync(d).flatMap(f => { const p = join(d, f); return statSync(p).isDirectory() ? (['node_modules', 'android', 'tests'].includes(f) ? [] : walk(p)) : /\.(tsx?|jsx?|json)$/.test(f) ? [p] : []; });

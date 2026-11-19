@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, Image, StyleSheet, ScrollView } from 'react-native';
 import type { DB, Item, Profile, Settings } from '../types';
 import { itemWarnings } from '../warnings';
@@ -12,8 +12,9 @@ const FILTERS: { k: Filter; label: string }[] = [
 ];
 const SORTS: { k: Sort; label: string }[] = [{ k: 'expiry', label: 'Expiry' }, { k: 'name', label: 'A–Z' }, { k: 'recent', label: 'Newest' }, { k: 'category', label: 'Category' }];
 
-export default function Pantry({ db, onOpen, onAdd, onReceipt, onBarcode, onLabel, onAbout, updateReady }: { db: DB; onOpen: (it: Item) => void; onAdd: () => void; onReceipt: () => void; onBarcode: () => void; onLabel: () => void; onAbout: () => void; updateReady?: boolean }) {
+export default function Pantry({ db, onOpen, onAdd, onReceipt, onBarcode, onLabel, onAbout, updateReady, focusFilter, focusNonce }: { db: DB; onOpen: (it: Item) => void; onAdd: () => void; onReceipt: () => void; onBarcode: () => void; onLabel: () => void; onAbout: () => void; updateReady?: boolean; focusFilter?: Filter | null; focusNonce?: number }) {
   const [filter, setFilter] = useState<Filter>('all');
+  useEffect(() => { if (focusFilter) setFilter(focusFilter); }, [focusFilter, focusNonce]);
   const [sort, setSort] = useState<Sort>('expiry');
   const [q, setQ] = useState('');
   const [cat, setCat] = useState<string | null>(null);

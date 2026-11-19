@@ -1,6 +1,7 @@
 // Data model. SCHEMA_VERSION bumps when the stored shape changes; logic.migrate() moves old data forward.
 // Fields marked "future" are stored but not used by the v0.0.1 UI yet; they reserve room for later versions.
-export const SCHEMA_VERSION = 6;  // 6: v0.0.6 adds db.recipePrefs (recipe sort + hidden categories); optional, migrate() sanitizes.
+export const SCHEMA_VERSION = 7;  // 7: v0.0.8 adds settings.remindersEnabled / reminderHour / reminderMinute; optional, migrate() sanitizes.
+// 6: v0.0.6 adds db.recipePrefs (recipe sort + hidden categories); optional, migrate() sanitizes.
 // 5: v0.0.5 intake log (IntakeEntry gets meal/servings detail, db.logPeopleIds, settings.logLowersPantry); all optional, migrate() sanitizes.
 //  4: v0.0.4 adds nutrition label fields (perContainer), settings.flagOverrides; all optional, migrate() sanitizes.
 //  1: v0.0.1 (profiles). 2: v0.0.2 adds expiryEstimated, brand, OFF nutrition (all optional, no migration needed). 3: v0.0.3 adds cookingProgress and timers (optional; migrate() sanitizes them)
@@ -59,6 +60,9 @@ export type Settings = {
   logLowersPantry?: boolean;     // v0.0.5: logging food also lowers the pantry item's amount left (default on)
   warnIngredients: string[];     // household watch list: extra words to flag when a label's ingredients contain them (v0.0.4)
   flagOverrides?: Record<string, boolean>; // v0.0.4: built-in ingredient flag rules switched on/off (rule id -> on). Missing = rule's default.
+  remindersEnabled?: boolean;    // v0.0.8: daily local "Use soon" reminder (default off)
+  reminderHour?: number;         // v0.0.8: 0–23, default 9
+  reminderMinute?: number;       // v0.0.8: 0–59, default 0
 };
 
 /** Daily nutrient limits per person. Defaults follow FDA Daily Values where one exists (editable later).
@@ -132,7 +136,7 @@ export type DB = {
   timers?: CookTimer[];                            // cooking timers (end times, so they survive leaving the app)
 };
 
-export const DEFAULT_SETTINGS: Settings = { soonDays: 5, assumeStaples: true, warnIngredients: [], flagOverrides: {}, logLowersPantry: true };
+export const DEFAULT_SETTINGS: Settings = { soonDays: 5, assumeStaples: true, warnIngredients: [], flagOverrides: {}, logLowersPantry: true, remindersEnabled: false, reminderHour: 9, reminderMinute: 0 };
 export const emptyDB = (): DB => ({ schema: SCHEMA_VERSION, items: [], profiles: [], eatingIds: null, settings: { ...DEFAULT_SETTINGS, flagOverrides: {} }, logPeopleIds: [], bookmarks: [], dismissedRecipes: [], categoryOffset: {}, recipePrefs: { ...DEFAULT_RECIPE_PREFS, hiddenCats: [] }, shopping: [], intake: [], cookingProgress: {}, timers: [] });
 
 export const CATEGORIES = ['Produce', 'Meat & Fish', 'Dairy & Eggs', 'Bakery', 'Pantry', 'Canned', 'Frozen', 'Spices', 'Snacks', 'Drinks', 'Condiments', 'Other'];
