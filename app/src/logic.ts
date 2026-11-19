@@ -281,6 +281,11 @@ export function migrate(raw: any): DB {
   if (!Array.isArray(db.eatingIds)) db.eatingIds = null;
   if (!db.categoryOffset || typeof db.categoryOffset !== 'object') db.categoryOffset = {};
   db.recipePrefs = cleanRecipePrefs(raw.recipePrefs); // v0.0.6
+  // v0.0.8: daily local Use soon reminders (default off). Kept inline to avoid a logic↔reminders import cycle.
+  const rh = Number(db.settings.reminderHour), rm = Number(db.settings.reminderMinute);
+  db.settings.remindersEnabled = db.settings.remindersEnabled === true;
+  db.settings.reminderHour = Number.isInteger(rh) && rh >= 0 && rh <= 23 ? rh : 9;
+  db.settings.reminderMinute = Number.isInteger(rm) && rm >= 0 && rm <= 59 ? rm : 0;
   db.schema = SCHEMA_VERSION;
   return db;
 }
