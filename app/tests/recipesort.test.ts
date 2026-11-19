@@ -63,12 +63,12 @@ t('cleanRecipePrefs sanitizes stored settings', () => {
   assert.deepEqual(cleanRecipePrefs({ sort: 'az', hiddenCats: ['Beef', 'Beef', 3, '', ' ', 'Pasta'] }), { sort: 'az', hiddenCats: ['Beef', 'Pasta'] });
   assert.equal(cleanRecipePrefs({ sort: 'missing', hiddenCats: Array.from({ length: 80 }, (_, i) => `c${i}`) }).hiddenCats.length, 50);
 });
-t('recipePrefs persist through migrate(); old data gets the defaults; schema is 6', () => {
-  assert.equal(SCHEMA_VERSION, 6);
+t('recipePrefs persist through migrate(); old data gets the defaults; schema is current', () => {
+  assert.equal(SCHEMA_VERSION, 7);
   const db = emptyDB(); assert.deepEqual(db.recipePrefs, DEFAULT_RECIPE_PREFS);
   const saved = migrate({ ...db, recipePrefs: { sort: 'category', hiddenCats: ['Dessert'] } });
   assert.deepEqual(saved.recipePrefs, { sort: 'category', hiddenCats: ['Dessert'] });
-  assert.equal(saved.schema, 6);
+  assert.equal(saved.schema, SCHEMA_VERSION);
   const old: any = { ...emptyDB(), schema: 5 }; delete old.recipePrefs;
   assert.deepEqual(migrate(old).recipePrefs, DEFAULT_RECIPE_PREFS);
   assert.deepEqual(migrate(JSON.parse(JSON.stringify(saved))).recipePrefs, saved.recipePrefs);

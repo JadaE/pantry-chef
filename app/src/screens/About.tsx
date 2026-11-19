@@ -7,13 +7,16 @@ import { clearCaches } from '../store';
 import { estimateExpiry } from '../groceries';
 import { todayISO, isValidISO } from '../logic';
 import { C } from '../theme';
-import { Btn, Card, Chip, Label } from '../ui';
+import { Btn, Card, Chip, Label, TimePickerModal } from '../ui';
 import FlagSettings from './FlagSettings';
+import { formatTime12 } from '../reminders';
+import { requestReminderPermission } from '../reminderSchedule';
 
 export default function About({ db, update, onUpdateFound }: { db: DB; update: (f: (d: DB) => DB) => void; onUpdateFound: (u: UpdateInfo | null) => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [found, setFound] = useState<UpdateInfo | null>(null);
+  const [timeOpen, setTimeOpen] = useState(false);
   const check = async () => {
     setBusy(true); setMsg(null);
     try {
@@ -41,6 +44,22 @@ export default function About({ db, update, onUpdateFound }: { db: DB; update: (
 
       <Label>Expiring soon means within</Label>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{[2, 3, 5, 7, 10].map(n => <Chip key={n} label={`${n} days`} on={db.settings.soonDays === n} onPress={() => setS({ soonDays: n })} />)}</View>
+
+      <Label>Use soon reminders</Label>
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ flex: 1, fontSize: 15, color: C.ink }}>Daily reminder for items that expire soon</Text>
+          <Switch value={db.settings.remindersEnabled === true} onValueChange={async v => {
+            if (!v) { setS({ remindersEnabled: false }); return; }
+            const ok = await requestReminderPermission();
+            if (!ok) { Alert.alert('Notifications are off', 'Allow notifications in Android Settings > Apps > Pantry Chef > Notifications to get Use soon reminders.'); return; }
+            setS({ remindersEnabled: true });
+          }} trackColor={{ true: C.primary }} />
+        </View>
+        <Btn label={`Remind at ${formatTime12(db.settings.reminderHour ?? 9, db.settings.reminderMinute ?? 0)}`} kind="soft" small style={{ marginTop: 12, alignSelf: 'flex-start' }} onPress={() => setTimeOpen(true)} />
+        <TimePickerModal visible={timeOpen} hour={db.settings.reminderHour ?? 9} minute={db.settings.reminderMinute ?? 0} title="Reminder time" onPick={(h, m) => setS({ reminderHour: h, reminderMinute: m })} onClose={() => setTimeOpen(false)} />
+        <Text style={[s.body, { marginTop: 10, marginBottom: 0 }]}>Reminders stay on this phone — nothing is sent to a server. If you restart your phone, open Pantry Chef once so the reminder can be set again.</Text>
+      </Card>
 
       <Label>Recipes</Label>
       <Card>
